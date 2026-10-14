@@ -33,18 +33,17 @@ export async function request<R>(method: string, path: string, body?: unknown): 
 
 export type StreamHandlers = { onToken?: (text: string) => void; onStatus?: (status: string) => void; signal?: AbortSignal };
 
-/** POST /api/chat/stream. Errors before the model is called (consent, permissions) throw like request();
- * an error event mid-stream throws an ApiError with that code. Resolves with the validated ChatResponse. */
-export async function chatStream(req: T.ChatRequest, { onToken, onStatus, signal }: StreamHandlers = {}): Promise<T.ChatResponse> {
-  const res = await send("POST", "/chat/stream", req, signal);
+/** POST an event-stream endpoint. Errors before streaming starts (consent, permissions) throw like request();
+ * an `error` event throws an ApiError with its code; resolves with the `done` event's data. */
+async function streamEvents<D>(path: string, body: unknown, onEvent: (event: string, data: unknown) => void, signal?: AbortSignal): Promise<D> {
+  const res = await send("POST", path, body, signal);
   if (!res.ok) throw await failure(res);
   if (!res.body) throw new ApiError("internal_error", "The server sent no stream.", res.status);
   try {
-    for await (const ev of readSSE(res.body) as AsyncGenerator<T.StreamEvent>) {
-      if (ev.event === "token") onToken?.(ev.data.text);
-      else if (ev.event === "status") onStatus?.(ev.data.status);
-      else if (ev.event === "done") return ev.data;
-      else if (ev.event === "error") throw new ApiError(ev.data.code, ev.data.message, 502);
+    for await (const ev of readSSE(res.body)) {
+      if (ev.event === "done") return ev.data as D;
+      if (ev.event === "error") { const e = ev.data as { code: string; message: string }; throw new ApiError(e.code, e.message, 502); }
+      onEvent(ev.event, ev.data);
     }
   } catch (e) {
     if (e instanceof ApiError) throw e;
@@ -54,6 +53,17 @@ export async function chatStream(req: T.ChatRequest, { onToken, onStatus, signal
   throw new ApiError("internal_error", "The stream ended without a result.", 0);
 }
 
+/** POST /api/chat/stream: resolves with the validated ChatResponse. */
+export const chatStream = (req: T.ChatRequest, { onToken, onStatus, signal }: StreamHandlers = {}) =>
+  streamEvents<T.ChatResponse>("/chat/stream", req, (event, data) => {
+    if (event === "token") onToken?.((data as { text: string }).text);
+    else if (event === "status") onStatus?.((data as { status: string }).status);
+  }, signal);
+
+/** POST /api/workspaces/{id}/agent/loop (agent mode): one `step` event per tool call, then the result. */
+export const agentLoop = (workspaceId: number, req: T.AgentLoopRequest, { onStep, signal }: { onStep?: (s: T.AgentLoopStep) => void; signal?: AbortSignal } = {}) =>
+  streamEvents<T.AgentLoopDone>(`/workspaces/${workspaceId}/agent/loop`, req, (event, data) => { if (event === "step") onStep?.(data as T.AgentLoopStep); }, signal);
+
 const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
 
 export const api = {
@@ -61,6 +71,7 @@ export const api = {
   settings: () => request<T.SettingsInfo>("GET", "/settings"),
   chat: (b: T.ChatRequest) => request<T.ChatResponse>("POST", "/chat", b),
   chatStream,
+  agentLoop,
   conversations: () => request<T.Conversation[]>("GET", "/conversations"),
   messages: (id: number) => request<T.Message[]>("GET", `/conversations/${id}/messages`),
   deleteConversation: (id: number) => request<void>("DELETE", `/conversations/${id}`),
@@ -95,6 +106,6 @@ export const api = {
 };
 
 /** Consent details the backend sends with 409 consent_required. */
-export type ConsentDetails = { files: string[]; layout?: boolean; chars: number; redactions: number; model: string; provider: string };
+export type ConsentDetails = { files: string[]; layout?: boolean; agent?: boolean; max_files?: number; chars: number; redactions: number; model: string; provider: string };
 export const consentDetails = (e: unknown): ConsentDetails | null =>
   e instanceof ApiError && e.code === "consent_required" && e.details ? (e.details as unknown as ConsentDetails) : null;

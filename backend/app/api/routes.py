@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agent import workflows
+from app.agent import loop, workflows
 from app.agent.orchestrator import enabled_names, prepare_chat, run_chat, sse, stream_chat
 from app.api.deps import get_workspace, require_token, tool_ctx
 from app.audit.log import audit
@@ -14,6 +14,7 @@ from app.core.errors import AppError
 from app.db.session import get_db
 from app.models import Conversation, Memory, Message, ProposedChange, SkillSetting, Task, Workspace
 from app.schemas import (
+    AgentLoopIn,
     AgentRunOut,
     ChangeOut,
     ChatRequest,
@@ -292,6 +293,18 @@ async def project_notes(body: ProjectNotesIn, request: Request, ws: Workspace = 
     """Read authorized files -> analyze -> draft a notes file -> propose it -> suggest a project memory."""
     st = request.app.state
     return await workflows.run_project_notes(ws, body, db, st.settings, st.provider, st.registry)
+
+
+@router.post(
+    "/workspaces/{workspace_id}/agent/loop", dependencies=[Depends(chat_limit)], response_class=StreamingResponse,
+    responses={200: {"content": {"text/event-stream": {}}, "description": "Events: step (one per tool call), then done or error."}},
+)
+async def agent_loop(body: AgentLoopIn, request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
+    """AG-02 agent mode (opt-in): the model chooses read-only tools and may propose changes; it can never write."""
+    st = request.app.state
+    plan = await loop.prepare_loop(ws, body, db, st.settings, st.provider, st.registry)
+    return StreamingResponse(loop.run_loop(plan, st.settings, st.provider), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/learn/explain", response_model=ComponentExplainOut, dependencies=[Depends(chat_limit)])

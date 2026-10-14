@@ -18,3 +18,4 @@ coverage/
 .orbit-token
 .coverage
 frontend/e2e/shots/
+frontend/public/mediapipe/

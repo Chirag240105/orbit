@@ -57,6 +57,18 @@ def render_notes(output: dict, workspace: str, goal: str, provider: str) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def finalize_draft(new_content: str, original: str | None, secrets: dict[str, str]) -> tuple[str, list[str]]:
+    """Model-written file content -> what may be proposed: secrets put back from their numbered placeholders, and the
+    original file's line endings kept (models reply with \\n)."""
+    warnings: list[str] = []
+    new_content = restore(new_content, secrets)
+    if "[REDACTED" in new_content:
+        warnings.append("The draft still contains [REDACTED] placeholders. Approving it would replace real values; edit it first.")
+    if original is not None and "\r\n" in original and "\r\n" not in new_content:
+        new_content = new_content.replace("\n", "\r\n")
+    return new_content, warnings
+
+
 def _propose(db: Session, settings: Settings, ws: Workspace, path: str, content: str, description: str, origin: str) -> ProposedChange:
     ctx = ToolContext(db=db, settings=settings, workspace=ws, granted={"workspace.read", "workspace.propose"})
     change = execute_tool("propose_change", {"path": path, "new_content": content, "description": description[:300]}, ctx)
@@ -140,12 +152,9 @@ async def run_draft(ws: Workspace, body: DraftIn, db: Session, settings: Setting
     new_content = output.get("new_content", "")
     if not new_content.strip():
         raise AppError("draft_failed", "The model did not return a usable draft. Try rephrasing the instruction.", 502)
-    new_content = restore(new_content, c.secrets)
-    if "[REDACTED" in new_content:
-        warnings.append("The draft still contains [REDACTED] placeholders. Approving it would replace real values; edit it first.")
     original = restore(c.ctx.files[0][1], c.secrets) if c.ctx.files else None
-    if original is not None and "\r\n" in original and "\r\n" not in new_content:
-        new_content = new_content.replace("\n", "\r\n")  # keep the file's line endings (models reply with \n)
+    new_content, more = finalize_draft(new_content, original, c.secrets)
+    warnings += more
     if original is not None and new_content == original:
         raise AppError("no_change", "The draft is identical to the current file.", 422)
     summary = output.get("summary") or "AI-drafted change"

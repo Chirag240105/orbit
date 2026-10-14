@@ -298,6 +298,12 @@ class AgentRunOut(BaseModel):
     warnings: list[str] = []
 
 
+class AgentLoopIn(BaseModel):
+    goal: str = Field(min_length=3, max_length=2000)
+    max_steps: int = Field(8, ge=1, le=12)
+    consent_external: bool = False
+
+
 class DraftIn(BaseModel):
     path: str = Field(min_length=1, max_length=500)
     instruction: str = Field(min_length=3, max_length=2000)

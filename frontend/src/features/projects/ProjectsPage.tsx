@@ -6,6 +6,7 @@ import { ConsentDialog } from "../../components/ConsentDialog";
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, Field, PageHeader, Panel, Skeleton, inputCls } from "../../components/ui";
 import { api, consentDetails, type ConsentDetails } from "../../lib/api";
 import type { Change, DraftRequest, Workspace } from "../../types/api";
+import { AgentModePanel } from "./AgentModePanel";
 import { AgentPanel } from "./AgentPanel";
 import { DiffView } from "./DiffView";
 import { FileTree } from "./FileTree";
@@ -100,7 +101,8 @@ function Workbench({ ws }: { ws: Workspace }) {
           </div>
         ) : null}
       </Panel>
-      <Panel title="Project agent"><AgentPanel ws={ws} /></Panel>
+      <Panel title="Project agent: write notes"><AgentPanel ws={ws} /></Panel>
+      <Panel title={<>Agent mode <span className="ml-1 font-normal text-muted">(experimental)</span></>}><AgentModePanel ws={ws} /></Panel>
       <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <Panel title="Files">
           <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); setTerm(query.trim()); }}>

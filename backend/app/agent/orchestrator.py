@@ -35,8 +35,9 @@ MAIN_KEYS = ("answer", "summary", "overview", "explanation", "clarifying_questio
 
 
 def enabled_names(db: Session, registry: SkillRegistry) -> set[str]:
-    off = {s.name for s in db.query(SkillSetting).filter(SkillSetting.enabled.is_(False))}
-    return {s.name for s in registry.all()} - off
+    """A stored setting wins; otherwise the skill's default (opt-in skills start off)."""
+    chosen = {s.name: s.enabled for s in db.query(SkillSetting)}
+    return {s.name for s in registry.all() if chosen.get(s.name, s.default_enabled)}
 
 
 def require_enabled(db: Session, registry: SkillRegistry, name: str) -> Skill:

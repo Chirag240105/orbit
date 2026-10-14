@@ -30,6 +30,10 @@ export type AgentStep = S["AgentStep"];
 export type ProjectNotesRequest = Body<S["ProjectNotesIn"], "goal">;
 export type DraftRequest = Body<S["DraftIn"], "path" | "instruction">;
 export type DraftResult = S["DraftOut"];
+export type AgentLoopRequest = Body<S["AgentLoopIn"], "goal">;
+/** One tool call (or the final `finish`) in an agent-mode run; args are shortened for display. */
+export type AgentLoopStep = { n: number; thought: string; tool: string; args: Record<string, string>; ok: boolean; observation: string };
+export type AgentLoopDone = { conversation_id: number; answer: string; steps: number; reads: number; proposals: Change[]; provider: ChatResponse["provider"]; warnings: string[] };
 export type ComponentExplainRequest = Body<S["ComponentExplainIn"], "scene" | "component">;
 export type ComponentExplanation = S["ComponentExplainOut"];
 

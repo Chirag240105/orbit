@@ -1,5 +1,6 @@
 from app.skills.base import Skill
 from app.skills.builtin import (
+    AgentMode,
     DraftChange,
     ExplainCode,
     ExplainComponent,
@@ -34,7 +35,7 @@ def default_registry() -> SkillRegistry:
     reg = SkillRegistry()
     for s in (
         GeneralQA(), ExplainCode(), ProjectOverview(), LearnTopic(), SummarizeText(), TaskPlan(),
-        ProjectNotes(), DraftChange(), ExplainComponent(),
+        ProjectNotes(), DraftChange(), ExplainComponent(), AgentMode(),
     ):
         reg.register(s)
     return reg

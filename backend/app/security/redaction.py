@@ -80,10 +80,11 @@ def redact(text: str) -> tuple[str, int]:
     return _apply(text, lambda _: "[REDACTED]")
 
 
-def redact_reversible(text: str) -> tuple[str, dict[str, str]]:
+def redact_reversible(text: str, mapping: dict[str, str] | None = None) -> tuple[str, dict[str, str]]:
     """Like redact(), but with numbered placeholders so secrets can be put back into a model-drafted
-    file (see restore()). The mapping never leaves this process."""
-    mapping: dict[str, str] = {}
+    file (see restore()). Pass the same `mapping` for several texts to keep numbers unique across them.
+    The mapping never leaves this process."""
+    mapping = {} if mapping is None else mapping
 
     def placeholder(secret: str) -> str:
         key = f"[REDACTED_{len(mapping) + 1}]"

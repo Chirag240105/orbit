@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 import { Badge, Button, EmptyState, ErrorState, PageHeader, Panel } from "../../components/ui";
 import { api } from "../../lib/api";
 import { CameraPanel } from "./CameraPanel";
-import { SceneCanvas, type ViewPreset } from "./SceneCanvas";
+import type { GestureEvent } from "../../lib/gestures";
+import { SceneCanvas, type SceneControls, type ViewPreset } from "./SceneCanvas";
 import { sceneForMarker, stepsOf, subjects, type Scene, type SceneComponent } from "./scenes";
 
 function AiExplanation({ scene, part }: { scene: Scene; part: SceneComponent }) {
@@ -53,6 +54,13 @@ export function VisualLearningPage() {
     if (current.current !== s.id) pickSubject(s.id);
   }, [pickSubject]);
   const setPreset = (v: ViewPreset) => { setView(v); setViewKey((k) => k + 1); };
+  const sceneControls = useRef<SceneControls | null>(null);
+  const onControls = useCallback((c: SceneControls | null) => { sceneControls.current = c; }, []);
+  const onGesture = useCallback((e: GestureEvent) => {
+    if (e.type === "rotate") sceneControls.current?.rotate(e.dx, e.dy);
+    else if (e.type === "zoom") sceneControls.current?.zoom(e.amount);
+    else { setView("overview"); setViewKey((k) => k + 1); }
+  }, []);
 
   return (
     <div>
@@ -72,7 +80,7 @@ export function VisualLearningPage() {
           ) : (
             <div className="relative h-[24rem] overflow-hidden rounded-lg border border-line md:h-[32rem]">
               {!ready && <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg text-sm text-muted">Loading 3D scene…</div>}
-              <SceneCanvas key={scene.id} scene={scene} selectedId={selected} isolatedId={isolated} view={view} viewKey={viewKey} onSelect={(id) => { setSelected(id); setLearning(null); }} onReady={() => setReady(true)} />
+              <SceneCanvas key={scene.id} scene={scene} selectedId={selected} isolatedId={isolated} view={view} viewKey={viewKey} onSelect={(id) => { setSelected(id); setLearning(null); }} onReady={() => setReady(true)} onControls={onControls} />
               <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-2">
                 <Button onClick={() => { setPreset("overview"); setSelected(null); setIsolated(null); }}>Reset view</Button>
                 <Button onClick={() => setPreset("top")} aria-pressed={view === "top"}>Top</Button>
@@ -119,7 +127,7 @@ export function VisualLearningPage() {
               ))}</ul>
             </Panel>
           )}
-          <Panel title="Camera (optional)"><CameraPanel knownMarker={knownMarker} onMarker={onMarker} /></Panel>
+          <Panel title="Camera (optional)"><CameraPanel knownMarker={knownMarker} onMarker={onMarker} onGesture={scene ? onGesture : undefined} /></Panel>
         </div>
       </div>
     </div>

@@ -38,6 +38,11 @@ def install() -> None:
         run([str(VENV_PY), "-m", "pip", "install", "-q", "-e", ".[dev]"], BACKEND)
     if not (FRONTEND / "node_modules").exists():
         run([NPM, "ci", "--no-audit", "--no-fund"], FRONTEND)
+    if not (FRONTEND / "public" / "mediapipe" / "hand_landmarker.task").exists():
+        try:  # gesture control only; everything else works without it
+            run([NPM, "run", "setup:vision"], FRONTEND)
+        except subprocess.CalledProcessError:
+            print("Gesture control files could not be installed (offline?). Run `npm run setup:vision` in frontend/ later.", flush=True)
     env_file = ROOT / ".env"
     if not env_file.exists():
         shutil.copy(ROOT / ".env.example", env_file)

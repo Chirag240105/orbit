@@ -7,7 +7,7 @@ import { MemoryPage } from "../src/features/memory/MemoryPage";
 import { ProjectsPage } from "../src/features/projects/ProjectsPage";
 import { MarkersPage } from "../src/features/visual-learning/MarkersPage";
 import { VisualLearningPage } from "../src/features/visual-learning/VisualLearningPage";
-import { api, ok, renderPage, server } from "./helpers";
+import { api, ok, renderPage, server, sseStream } from "./helpers";
 
 const NOW = new Date().toISOString();
 const mem = (id: number, content: string, extra: object = {}) => ({ id, content, type: "fact", source: "user", confirmed: true, created_at: NOW, updated_at: NOW, ...extra });
@@ -68,11 +68,11 @@ describe("Projects: agent, drafts and approvals", () => {
       { name: "propose", status: "done", detail: "Created a proposed change. Nothing is written until you approve it." }, { name: "remember", status: "done", detail: "Suggested a project memory." },
     ],
   };
-  function workspace(changes: object[] = []) {
+  function workspace(changes: object[] = [], skills: object[] = []) {
     server.use(
       ok("/workspaces", [WS]), ok("/workspaces/1/tree", [{ path: "app/auth/login.py", size: 300 }]),
       ok("/workspaces/1/summary", { file_count: 1, by_extension: { ".py": 1 }, top_level_folders: { app: 1 }, config_files: [], dependencies: { "pyproject.toml": ["fastapi"] }, note: "Computed locally." }),
-      ok("/changes", changes),
+      ok("/changes", changes), ok("/skills", skills),
     );
   }
 
@@ -123,6 +123,51 @@ describe("Projects: agent, drafts and approvals", () => {
     fireEvent.change(screen.getByLabelText("Ask ORBIT to edit app/auth/login.py"), { target: { value: "Add a docstring" } });
     fireEvent.click(screen.getByRole("button", { name: "Draft change" }));
     await waitFor(() => expect(body).toEqual({ path: "app/auth/login.py", instruction: "Add a docstring" }));
+  });
+});
+
+describe("Agent mode (AG-02)", () => {
+  const WS = { id: 1, name: "backend", path: "/code/backend", allow_write: false, created_at: NOW };
+  const base = (enabled: boolean) => server.use(
+    ok("/workspaces", [WS]), ok("/workspaces/1/tree", []), ok("/changes", []),
+    ok("/workspaces/1/summary", { file_count: 0, by_extension: {}, top_level_folders: {}, config_files: [], dependencies: {}, note: "" }),
+    ok("/skills", [{ name: "agent_mode", title: "Agent mode", description: "", required_permissions: [], requires_files: false, uses_workspace_summary: true, invocation: "workflow", enabled, input_schema: {}, output_schema: {} }]),
+  );
+
+  it("is off until enabled in Skills", async () => {
+    base(false);
+    renderPage(<ProjectsPage />, { activeWorkspace: 1 });
+    expect(await screen.findByRole("link", { name: "Turn it on in Skills" })).toHaveAttribute("href", "/skills");
+    expect(screen.queryByRole("button", { name: "Run agent" })).toBeNull();
+  });
+
+  it("asks for consent, then shows each step live and the proposals", async () => {
+    base(true);
+    const bodies: Record<string, unknown>[] = [];
+    const proposal = { id: 4, workspace_id: 1, rel_path: "app/auth/login.py", description: "Agent: clearer errors", original_content: "a\n", new_content: "b\n", status: "pending", origin: "ai", created_at: NOW, decided_at: null };
+    server.use(http.post(api("/workspaces/1/agent/loop"), async ({ request }) => {
+      const b = (await request.json()) as Record<string, unknown>;
+      bodies.push(b);
+      if (!b.consent_external) return HttpResponse.json({ error: { code: "consent_required", message: "Confirm", details: { files: [], layout: true, agent: true, max_files: 8, chars: 48000, redactions: 0, provider: "nebius", model: "nvidia/test" } } }, { status: 409 });
+      return new HttpResponse(sseStream([
+        ["step", { n: 1, thought: "Find the login code", tool: "suggest_files", args: { query: "login" }, ok: true, observation: "[...]" }],
+        ["step", { n: 2, thought: "", tool: "apply_change", args: {}, ok: false, observation: "error: 'apply_change' is not an available tool." }],
+        ["step", { n: 3, thought: "Done", tool: "finish", args: {}, ok: true, observation: "" }],
+        ["done", { conversation_id: 9, answer: "I proposed clearer error messages.", steps: 3, reads: 1, proposals: [proposal], provider: { name: "nebius", model: "nvidia/test", is_demo: false }, warnings: [] }],
+      ]), { headers: { "content-type": "text/event-stream" } });
+    }));
+    renderPage(<ProjectsPage />, { activeWorkspace: 1 });
+    fireEvent.change(await screen.findByLabelText("What should the agent do?"), { target: { value: "Improve login errors" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("up to 8 files the agent chooses");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("I proposed clearer error messages.")).toBeInTheDocument();
+    const trace = screen.getByRole("list", { name: "Agent steps" });
+    expect(within(trace).getByText("Rank files")).toBeInTheDocument();
+    expect(within(trace).getByText("refused")).toBeInTheDocument();
+    expect(screen.getAllByText("app/auth/login.py").length).toBeGreaterThan(0);
+    expect(bodies.map((b) => b.consent_external ?? false)).toEqual([false, true]);
   });
 });
 

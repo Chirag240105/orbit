@@ -1,6 +1,33 @@
 {
   "components": {
     "schemas": {
+      "AgentLoopIn": {
+        "properties": {
+          "consent_external": {
+            "default": false,
+            "title": "Consent External",
+            "type": "boolean"
+          },
+          "goal": {
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Goal",
+            "type": "string"
+          },
+          "max_steps": {
+            "default": 8,
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Max Steps",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "goal"
+        ],
+        "title": "AgentLoopIn",
+        "type": "object"
+      },
       "AgentRunOut": {
         "properties": {
           "change": {
@@ -2487,6 +2514,52 @@
           }
         },
         "summary": "Patch Workspace"
+      }
+    },
+    "/api/workspaces/{workspace_id}/agent/loop": {
+      "post": {
+        "description": "AG-02 agent mode (opt-in): the model chooses read-only tools and may propose changes; it can never write.",
+        "operationId": "agent_loop_api_workspaces__workspace_id__agent_loop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentLoopIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Events: step (one per tool call), then done or error."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Loop"
       }
     },
     "/api/workspaces/{workspace_id}/agent/notes": {

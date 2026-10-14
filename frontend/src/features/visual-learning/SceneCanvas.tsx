@@ -5,6 +5,8 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { Scene, SceneComponent, Vec3 } from "./scenes";
 
 export type ViewPreset = "overview" | "top" | "front";
+/** Imperative camera moves for gesture control (CV-02). Angles in fractions of a half turn. */
+export type SceneControls = { rotate: (dx: number, dy: number) => void; zoom: (amount: number) => void };
 
 export function webglAvailable(): boolean {
   try {
@@ -50,7 +52,7 @@ const presetPosition = (scene: Scene, view: ViewPreset): Vec3 => {
   return scene.camera.position;
 };
 
-export function SceneCanvas({ scene, selectedId, isolatedId, view, viewKey, onSelect, onReady }: { scene: Scene; selectedId: string | null; isolatedId: string | null; view: ViewPreset; viewKey: number; onSelect: (id: string) => void; onReady: () => void }) {
+export function SceneCanvas({ scene, selectedId, isolatedId, view, viewKey, onSelect, onReady, onControls }: { scene: Scene; selectedId: string | null; isolatedId: string | null; view: ViewPreset; viewKey: number; onSelect: (id: string) => void; onReady: () => void; onControls?: (c: SceneControls | null) => void }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const byId = Object.fromEntries(scene.components.map((c) => [c.id, c]));
   const [supported] = useState(webglAvailable);
@@ -61,6 +63,27 @@ export function SceneCanvas({ scene, selectedId, isolatedId, view, viewKey, onSe
     ctl.target.set(...scene.camera.target);
     ctl.update();
   }, [scene, view, viewKey]);
+  useEffect(() => {
+    if (!onControls) return;
+    onControls({
+      rotate: (dx, dy) => {
+        const ctl = controls.current;
+        if (!ctl) return;
+        ctl.setAzimuthalAngle(ctl.getAzimuthalAngle() + dx * Math.PI);
+        ctl.setPolarAngle(Math.min(Math.PI / 2.05, Math.max(0.15, ctl.getPolarAngle() + dy * Math.PI)));
+        ctl.update();
+      },
+      zoom: (amount) => {
+        const ctl = controls.current;
+        if (!ctl) return;
+        const step = 1 + Math.min(0.5, Math.abs(amount));
+        if (amount > 0) ctl.dollyIn(step);
+        else ctl.dollyOut(step);
+        ctl.update();
+      },
+    });
+    return () => onControls(null);
+  }, [onControls]);
   if (!supported) return <div role="alert" className="flex h-full items-center justify-center p-6 text-center text-sm">{NO_WEBGL}</div>;
   return (
     <Boundary>

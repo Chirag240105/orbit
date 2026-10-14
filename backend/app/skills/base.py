@@ -46,6 +46,7 @@ class Skill:
     requires_files: bool = False
     uses_workspace_summary: bool = False  # file names and dependency names are sent (needs consent if hosted)
     invocation: str = "chat"  # "chat": routable and selectable in chat; "workflow": only used by its own endpoint
+    default_enabled: bool = True  # False = opt-in: off until the user turns it on in Skills
     route_pattern: str = ""  # keyword routing (regex on the lowercased message) when no skill is chosen
     max_tokens: int | None = None
     output_model: type[BaseModel]
