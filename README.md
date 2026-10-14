@@ -2,68 +2,61 @@
 
 One personal agent. Shared memory. Reusable skills. Permission-controlled actions. A structured interface for understanding and acting.
 
-ORBIT is a local-first desktop-style web app for developers and students who want an AI assistant that remembers only what they approve, can read only the folders they authorize, and never changes a file without an explicit approval. Built for the NVIDIA x Nebius Personal AI hackathon track by Chirag (agent, backend, security) and Charanjeet (frontend, UX).
+ORBIT is a local-first web app for developers and students who want an AI agent that remembers only what they approve, can read only the folders they authorize, and never changes a file without an explicit approval. It runs **NVIDIA Nemotron** on **Nebius Token Factory**. Built for the NVIDIA x Nebius Personal AI hackathon track by Chirag (agent, backend, security) and Charanjeet (frontend, UX).
 
-## Three capabilities
-- **A. Chat and skills:** natural-language requests routed to reusable skills with validated structured output and user-approved memory.
-- **B. Visual Learning Studio:** an interactive 3D cloud-architecture scene with step-by-step learning and an opt-in camera panel.
-- **C. Workspace intelligence:** authorize a folder, then list, search, preview and explain files; propose changes that need approval.
+## Three capabilities, one agent
+- **A. Chat and skills:** ask, learn a topic (explanation, text diagram, real-world example, interview questions), summarize, plan, explain a file, understand a project. Answers stream in and are validated against a schema; follow-ups keep the conversation's context.
+- **B. Workspace agent:** authorize a folder; search and preview files; let ORBIT suggest relevant files, analyze them, **write notes and propose the file**, draft code changes, and suggest project memories. Every write needs your approval and is verified on disk.
+- **C. Visual Learning Studio:** two interactive 3D system scenes with step-by-step learning and AI explanations; show a **printed marker** to the camera and ORBIT opens the matching scene.
 
 ## Feature status (read this first)
 
 | Feature | Status |
 |---|---|
-| Backend API, DB, error handling, CORS, rate limit, audit | **Working**, 51 automated tests |
-| Chat orchestration, skill registry (4 skills), schema-validated output | **Working** (tested with demo provider and mocked HTTP) |
-| Nebius + Nemotron provider | **Implemented, unverified against the live API.** Needs your key; default model ID is a guess to confirm (`scripts/list_models.py`) |
+| Backend API, Alembic migrations, errors, CORS, local API token, rate limit, audit | **Working**, ~160 automated tests, 92% coverage |
+| Chat orchestration, 6 chat skills + 3 workflow skills, schema validation with one repair round, streaming (SSE), conversation history, optional model routing | **Working** (tested with demo provider and a scripted fake model) |
+| Project agent (read → analyze → draft → propose → remember), AI-drafted changes with secrets kept local, file ranking for questions | **Working**, API and browser tested |
+| Nebius + Nemotron provider | **Implemented, unverified against the live API.** Needs your key; the default model ID is a guess to confirm (`scripts/list_models.py`). Live tests are ready (`docs/TESTING.md`) |
 | Demo mode (`ORBIT_DEMO_MODE=true`) | **Mocked on purpose**: deterministic, labeled "Demo", no model call |
-| Memory (add, edit, search, confirm, delete, delete all) | **Working** (keyword retrieval, not embeddings) |
-| Workspace policy, read-only inspection, proposal and approval flow | **Working**, unit and API tested |
-| Secret redaction, consent before external send | **Working**, best-effort redaction |
-| All 8 screens | **Built**; typecheck, 10 tests and production build pass. **Not yet reviewed in a real browser** |
-| 3D scene and camera panel | **Built, not verified in a browser or on a device** |
-| OpenCV / MediaPipe recognition | **Not implemented** (tasks CV-01, CV-02) |
-| Alembic migrations | **Scaffolded only**; tables are created with `create_all` |
-| Streaming, local API token, Docker, Tauri, model-driven tool use | **Planned** (see `TASKS.md`) |
+| Memory (add, edit, search, filter, bulk confirm, delete all; vetted suggestions) | **Working** (stemmed keyword retrieval; evaluated in `docs/MEMORY_DESIGN.md`) |
+| Workspace policy, race-safe verified writes, proposal and approval flow | **Working**, unit, API, Linux race and browser tested |
+| Secret redaction, consent before workspace data is sent | **Working**, best-effort redaction |
+| All screens | **Working and checked in a real browser** (Edge): 26 automated browser checks, no horizontal scroll at 360/768/1280 px. Not yet tried on phones or with a screen reader |
+| 3D scenes, camera, printed-marker recognition | **Working in Edge** (WebGL, fake camera with a marker video). Not yet tried with a physical webcam |
+| Gesture control (MediaPipe) | **Not built** (CV-02) |
+| Desktop packaging (Tauri), Docker | **Not built**; local web app chosen for the demo (`docs/DEPLOYMENT.md`) |
+| Open-ended model tool loop | **Deliberately not built**: the agent is a fixed pipeline with approval gates (`docs/AI_AGENT_DESIGN.md`) |
 
 ## Architecture
-React frontend → FastAPI backend (127.0.0.1) → SQLite. The backend owns the API key, the file policy, memory, and the model call. See `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/SECURITY_MODEL.md`.
+React frontend → Vite dev proxy (adds the local API token) → FastAPI backend (127.0.0.1) → SQLite. The backend owns the API key, the file policy, memory, and the model call. See `docs/ARCHITECTURE.md`, `docs/DATA_FLOW.md`, `docs/THREAT_MODEL.md`, `docs/SECURITY_MODEL.md`.
 
-**Why this stack:** FastAPI and Pydantic give typed validation with little code; SQLite needs no server; React + TypeScript + Vite is quick for two people; React Three Fiber fits the 3D scene. No vector DB, Redis, or microservices because nothing needs them yet.
+**Why this stack:** FastAPI and Pydantic give typed validation with little code; SQLite needs no server; React + TypeScript + Vite is quick for two people; React Three Fiber fits the 3D scenes. No vector DB, Redis, or microservices because nothing needs them yet.
 
 ## Privacy: what leaves your computer
-With a provider configured, your chat messages and matching memories go to the hosted model (Nebius). File excerpts go only if you select them, after redaction, and after you confirm in a dialog. Indexing, search, permissions and the database stay local. Camera video stays in the browser. Demo mode sends nothing. ORBIT is **not** fully local while hosted inference is on.
+With a provider configured, your chat messages, recent turns of the conversation, and matching confirmed memories go to the hosted model (Nebius). File excerpts and the project layout go only when a skill needs them, after redaction, and after you confirm in a dialog. Indexing, search, file ranking, permissions, diffs and the database stay local. Camera video and marker recognition stay in the browser. Demo mode sends nothing. ORBIT is **not** fully local while hosted inference is on. Details: `docs/DATA_FLOW.md`.
 
 ## Setup
-Prerequisites: Python 3.11+, Node 20+ (tested on Python 3.12, Node 22).
+Prerequisites: Python 3.11+, Node 20+. Verified on Windows 11 (Python 3.11, Node 24, Edge) and Ubuntu via WSL (Python 3.14, backend suite). CI runs Python 3.12 and Node 22.
 
 ```bash
-cp .env.example .env            # edit: NEBIUS_API_KEY=...  (or ORBIT_DEMO_MODE=true to try the UI)
-cd backend && python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn app.main:app_factory --factory --reload     # http://127.0.0.1:8000/api/docs
-# new terminal
-cd frontend && npm install && npm run dev            # http://localhost:5173
+python scripts/dev.py          # installs what is missing, creates .env, starts backend :8000 and frontend :5173
+python scripts/dev.py --demo   # try it without a key (labeled demo output)
 ```
-Or run both with `scripts/dev.sh` after installing each. Never commit `.env`.
+Then open http://localhost:5173. Put `NEBIUS_API_KEY=...` in `.env` for real answers. Never commit `.env`.
 
-**Environment variables:** `NEBIUS_API_KEY`, `NEBIUS_BASE_URL` (default `https://api.tokenfactory.nebius.com/v1/`), `NEBIUS_MODEL`, `ORBIT_DEMO_MODE`, `ORBIT_DATABASE_URL`, `ORBIT_ALLOWED_ORIGINS`, `ORBIT_MAX_FILE_BYTES`. Details in `.env.example`.
+Manual setup instead: `cp .env.example .env`; `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && uvicorn app.main:app_factory --factory --reload`; in another terminal `cd frontend && npm install && npm run dev`.
 
-**Tests:** see `docs/TESTING.md` (`pytest -q`, `ruff check`, `npm run typecheck`, `npm test`, `npm run build`).
+**Environment variables:** `NEBIUS_API_KEY`, `NEBIUS_BASE_URL`, `NEBIUS_MODEL`, `NEBIUS_MAX_TOKENS`, `ORBIT_DEMO_MODE`, `ORBIT_MODEL_ROUTING`, `ORBIT_REPAIR_RETRIES`, `ORBIT_DATABASE_URL`, `ORBIT_ALLOWED_ORIGINS`, `ORBIT_MAX_FILE_BYTES`, `ORBIT_CHAT_RATE_LIMIT`, `ORBIT_API_TOKEN`, `ORBIT_TOKEN_FILE`. Details in `.env.example`.
 
-**Trying the workspace features safely:** authorize `examples/example-project` in Projects.
+**Tests:** `docs/TESTING.md` (backend `pytest`, frontend `npm test`, browser `npm run e2e`, live-model tests).
 
-## Troubleshooting
-- *"Backend not reachable":* start uvicorn on port 8000 (the Vite dev server proxies `/api`).
-- *Setup banner in chat:* no key and no demo mode set; edit `.env` and restart the backend.
-- *`provider_model_not_found`:* run `python scripts/list_models.py` and set `NEBIUS_MODEL`.
-- *`provider_empty_response`:* Nemotron on Token Factory is a reasoning model and can spend its budget thinking; retry.
-- *3D view blank:* WebGL is unavailable or disabled in the browser.
-- *Camera blocked:* allow it in the browser's site settings; it needs `localhost` or HTTPS.
-- *`workspace_too_broad`:* choose a project folder, not `/`, your home folder, or a top-level system folder.
+**Trying the workspace features safely:** authorize a copy of `examples/example-project` in Projects (the agent can write into it once you allow writes).
+
+## Documentation
+Overview `docs/PROJECT_OVERVIEW.md` · Architecture `docs/ARCHITECTURE.md` · Data flow `docs/DATA_FLOW.md` · API `docs/API_REFERENCE.md` · Agent `docs/AI_AGENT_DESIGN.md` · Memory `docs/MEMORY_DESIGN.md` · Database `docs/DATABASE_SCHEMA.md` · Security `docs/SECURITY_MODEL.md`, `docs/THREAT_MODEL.md` · Workspace `docs/WORKSPACE_ACCESS.md` · Visual learning `docs/VISUAL_LEARNING.md` · UI `docs/UI_UX_GUIDE.md` · Deployment `docs/DEPLOYMENT.md` · Troubleshooting `docs/TROUBLESHOOTING.md` · Testing `docs/TESTING.md` · Hackathon rules `docs/HACKATHON.md` · Demo `docs/DEMO_SCRIPT.md` · Submission draft `docs/SUBMISSION.md` · Extending `docs/EXTENDING.md`, `docs/SKILL_DEVELOPMENT.md`.
 
 ## Limitations
-Single user, no authentication on the local API yet (SEC-01). Redaction is pattern-based and incomplete. The model cannot call tools in this version. Camera recognition does not exist. Memory retrieval is keyword-based.
+Single user, local only. Redaction is pattern-based and incomplete. The live Nemotron call has not been verified yet. Marker recognition only knows ORBIT's printed markers. Memory retrieval is keyword-based. The Windows write path narrows, but does not close, the check-then-write race (Linux/macOS close it).
 
 ## Team and contributing
-Chirag: AI agent, backend architecture, integrations, security. Charanjeet: frontend, UI/UX, visual learning, integration. Work from `TASKS.md`; process in `docs/TEAM_WORKFLOW.md` and `CONTRIBUTING.md`. To add a feature, a skill, or a screen: `docs/EXTENDING.md`, `docs/SKILL_DEVELOPMENT.md`.
+Chirag: AI agent, backend architecture, integrations, security. Charanjeet: frontend, UI/UX, visual learning, integration. Work from `TASKS.md`; process in `docs/TEAM_WORKFLOW.md` and `CONTRIBUTING.md`.
