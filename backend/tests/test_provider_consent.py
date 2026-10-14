@@ -2,16 +2,16 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import Settings
 from app.main import create_app
+from tests.conftest import TOKEN, make_settings
 
 
-def hosted_client(handler):
-    app = create_app(Settings(database_url="sqlite://", _env_file=None, nebius_api_key="test-key-not-real"))
+def hosted_client(handler, **kw):
+    app = create_app(make_settings(nebius_api_key="test-key-not-real", **kw))
     import app.providers.nebius as nb
     real = httpx.AsyncClient
     nb.httpx.AsyncClient = lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
-    return TestClient(app, raise_server_exceptions=False), lambda: setattr(nb.httpx, "AsyncClient", real)
+    return TestClient(app, raise_server_exceptions=False, headers={"X-Orbit-Token": TOKEN}), lambda: setattr(nb.httpx, "AsyncClient", real)
 
 
 def ok(request):

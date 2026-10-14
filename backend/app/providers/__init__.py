@@ -8,14 +8,14 @@ class DemoProvider(ChatProvider):
 
     name, model, is_demo, configured = "demo", "deterministic-demo", True, True
 
-    async def complete(self, messages: list[dict]) -> ProviderResult:  # pragma: no cover
+    async def complete(self, messages: list[dict], *, max_tokens: int | None = None) -> ProviderResult:  # pragma: no cover
         raise AppError("demo_provider", "Demo provider does not perform model inference.", 500)
 
 
 class UnconfiguredProvider(ChatProvider):
     name, model, configured = "none", "", False
 
-    async def complete(self, messages: list[dict]) -> ProviderResult:
+    async def complete(self, messages: list[dict], *, max_tokens: int | None = None) -> ProviderResult:
         raise AppError(
             "provider_not_configured",
             "No model provider is configured. Set NEBIUS_API_KEY in .env (or ORBIT_DEMO_MODE=true for a labeled demo).",

@@ -54,3 +54,12 @@ def test_tasks_flow(client):
 def test_cors_rejects_unknown_origin(client):
     r = client.get("/api/health", headers={"Origin": "http://evil.example"})
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_chat_rate_limit_is_per_app():
+    from tests.conftest import make_client
+
+    limited = make_client(demo_mode=True, chat_rate_limit=2)
+    codes = [limited.post("/api/chat", json={"message": "hi"}).status_code for _ in range(3)]
+    assert codes == [200, 200, 429]
+    assert make_client(demo_mode=True).post("/api/chat", json={"message": "hi"}).status_code == 200

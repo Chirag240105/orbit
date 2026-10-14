@@ -15,7 +15,7 @@ class Memory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     content: Mapped[str] = mapped_column(Text)
     type: Mapped[str] = mapped_column(String(20), default="fact")
-    source: Mapped[str] = mapped_column(String(30), default="user")
+    source: Mapped[str] = mapped_column(String(30), default="user")  # user | chat_suggestion | agent
     confirmed: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -59,6 +59,7 @@ class ProposedChange(Base):
     base_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     new_content: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(12), default="pending")  # pending|applied|rejected|stale
+    origin: Mapped[str] = mapped_column(String(10), default="user", server_default="user")  # user | ai
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

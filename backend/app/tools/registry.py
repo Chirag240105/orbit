@@ -31,6 +31,10 @@ class SearchIn(BaseModel):
     query: str = Field(min_length=1, max_length=100)
 
 
+class SuggestIn(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+
+
 class ReadIn(BaseModel):
     path: str = Field(min_length=1, max_length=500)
 
@@ -63,6 +67,10 @@ def _search(ctx: ToolContext, a: SearchIn):
     return ws.search(ctx.workspace.path, a.query, ctx.settings.max_file_bytes)
 
 
+def _suggest(ctx: ToolContext, a: SuggestIn):
+    return ws.rank_files(ctx.workspace.path, a.query, ctx.settings.max_file_bytes)
+
+
 def _read(ctx: ToolContext, a: ReadIn):
     return {"path": a.path, "content": ws.read_text(ctx.workspace.path, a.path, ctx.settings.max_file_bytes)}
 
@@ -91,7 +99,7 @@ def _apply(ctx: ToolContext, a: ApplyIn):
         change.status, change.decided_at = "stale", datetime.now(timezone.utc)
         ctx.db.commit()
         raise AppError("stale_change", "The file changed after this proposal was made. Propose the change again.", 409)
-    ws.apply_write(ctx.workspace.path, change.rel_path, change.new_content, ctx.settings.max_file_bytes)
+    ws.apply_write(ctx.workspace.path, change.rel_path, change.new_content, ctx.settings.max_file_bytes)  # verifies the written hash
     change.status, change.decided_at = "applied", datetime.now(timezone.utc)
     ctx.db.commit()
     return change
@@ -102,6 +110,7 @@ TOOLS: dict[str, ToolSpec] = {
     for t in (
         ToolSpec("list_files", "List permitted files in the workspace", ("workspace.read",), False, ListFilesIn, _list),
         ToolSpec("search_files", "Search permitted files by name and content", ("workspace.read",), False, SearchIn, _search),
+        ToolSpec("suggest_files", "Rank permitted files by relevance to a question (local, nothing is sent)", ("workspace.read",), False, SuggestIn, _suggest),
         ToolSpec("read_file", "Read one permitted text file", ("workspace.read",), False, ReadIn, _read),
         ToolSpec("propose_change", "Create a proposal to change a file (does not write)", ("workspace.propose",), False, ProposeIn, _propose),
         ToolSpec("apply_change", "Write an approved proposal to disk", ("workspace.write",), True, ApplyIn, _apply),

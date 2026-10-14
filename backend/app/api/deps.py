@@ -1,3 +1,5 @@
+import hmac
+
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
@@ -5,6 +7,14 @@ from app.core.errors import AppError
 from app.db.session import get_db
 from app.models import Workspace
 from app.tools.registry import ToolContext
+
+
+def require_token(request: Request) -> None:
+    """SEC-01: every API call needs the per-install token. The dev proxy adds it; browsers never see it.
+    Read from the raw header (not a declared parameter) so it stays out of the public OpenAPI contract."""
+    supplied = request.headers.get("x-orbit-token", "")
+    if not hmac.compare_digest(supplied.encode(), request.app.state.api_token.encode()):
+        raise AppError("unauthorized", "Missing or invalid local API token. Open ORBIT through its own dev server (npm run dev).", 401)
 
 
 def get_workspace(workspace_id: int, db: Session = Depends(get_db)) -> Workspace:

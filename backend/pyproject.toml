@@ -14,11 +14,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+# 85, not the ~92 measured: each OS skips one of the two write paths in workspace/service.py (SEC-04).
+fail_under = 85
+show_missing = true
+skip_covered = true
 
 [tool.ruff]
 line-length = 100

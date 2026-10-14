@@ -2,47 +2,68 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agent.orchestrator import enabled_names, run_chat
-from app.api.deps import get_workspace, tool_ctx
+from app.agent import workflows
+from app.agent.orchestrator import enabled_names, prepare_chat, run_chat, sse, stream_chat
+from app.api.deps import get_workspace, require_token, tool_ctx
 from app.audit.log import audit
 from app.core.errors import AppError
-from app.core.ratelimit import RateLimiter
 from app.db.session import get_db
 from app.models import Conversation, Memory, Message, ProposedChange, SkillSetting, Task, Workspace
 from app.schemas import (
+    AgentRunOut,
     ChangeOut,
     ChatRequest,
     ChatResponse,
+    ComponentExplainIn,
+    ComponentExplainOut,
     ConversationOut,
+    DraftIn,
+    DraftOut,
+    FileContent,
+    FileEntry,
+    FileSuggestion,
+    HealthOut,
     MemoryIn,
     MemoryOut,
     MemoryPatch,
     MessageOut,
+    ProjectNotesIn,
     ProposeChangeIn,
+    SearchHit,
+    SettingsOut,
     SkillOut,
     SkillPatch,
+    SkillToggleOut,
     TaskIn,
     TaskOut,
     TaskPatch,
     WorkspaceIn,
     WorkspaceOut,
     WorkspacePatch,
+    WorkspaceSummary,
 )
 from app.skills.base import SkillInput
 from app.tools.registry import TOOLS, execute_tool
 from app.workspace import service as wsvc
 from app.workspace.policy import validate_workspace_root
 
-router = APIRouter(prefix="/api")
-chat_limit = RateLimiter(limit=30, window_s=60)
+public = APIRouter(prefix="/api")  # no token: liveness only
+router = APIRouter(prefix="/api", dependencies=[Depends(require_token)])
+
+
+def chat_limit(request: Request) -> None:
+    """Per-app limiter for endpoints that call the model (so separate app instances never share a budget)."""
+    request.app.state.chat_limiter(request)
+
 VERSION = "0.1.0"
 
 
 # ---------- health & settings ----------
-@router.get("/health")
+@public.get("/health", response_model=HealthOut)
 def health(request: Request, db: Session = Depends(get_db)):
     p, s = request.app.state.provider, request.app.state.settings
     db.execute(select(1))
@@ -52,16 +73,18 @@ def health(request: Request, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/settings")
+@router.get("/settings", response_model=SettingsOut)
 def settings_info(request: Request):
     s, p = request.app.state.settings, request.app.state.provider
     return {
         "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo, "hosted": p.name == "nebius"},
         "limits": {"max_file_bytes": s.max_file_bytes, "max_context_chars": s.max_context_chars},
+        "model_routing": s.model_routing,
         "tools": [{"name": t.name, "description": t.description, "permissions": list(t.permissions), "requires_confirmation": t.requires_confirmation} for t in TOOLS.values()],
         "privacy": [
             "Chat messages and matched memories are sent to the hosted model provider when a provider is configured.",
-            "Workspace file excerpts are sent only for files you select, after secret redaction, and only after you confirm.",
+            "Workspace file excerpts, and the project layout (file and dependency names), are sent only after secret redaction and only after you confirm.",
+            "Earlier messages of the current conversation are included so follow-up questions make sense.",
             "File indexing, search, and permissions run on this computer.",
             "Camera video stays in your browser. It is not recorded or uploaded.",
             "Demo mode sends nothing anywhere and does not use a model.",
@@ -74,6 +97,22 @@ def settings_info(request: Request):
 async def chat(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
     st = request.app.state
     return await run_chat(req, db, st.settings, st.provider, st.registry)
+
+
+@router.post(
+    "/chat/stream", dependencies=[Depends(chat_limit)], response_class=StreamingResponse,
+    responses={200: {"content": {"text/event-stream": {}}, "description": "Events: status, token, then done (a ChatResponse) or error."}},
+)
+async def chat_stream(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
+    """Same as /chat, streamed. Errors found before the model is called (consent, permissions) are normal JSON errors."""
+    st = request.app.state
+    plan = await prepare_chat(req, db, st.settings, st.provider, st.registry)
+    if isinstance(plan, ChatResponse):
+        async def single():
+            yield sse("done", plan.model_dump(mode="json"))
+        return StreamingResponse(single(), media_type="text/event-stream")
+    return StreamingResponse(stream_chat(plan, req.message, st.settings, st.provider), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
@@ -157,12 +196,14 @@ def skills(request: Request, db: Session = Depends(get_db)):
     reg = request.app.state.registry
     on = enabled_names(db, reg)
     return [
-        SkillOut(name=s.name, title=s.title, description=s.description, required_permissions=list(s.required_permissions), requires_files=s.requires_files, enabled=s.name in on, input_schema=SkillInput.model_json_schema(), output_schema=s.output_model.model_json_schema())
+        SkillOut(name=s.name, title=s.title, description=s.description, required_permissions=list(s.required_permissions), requires_files=s.requires_files,
+                 uses_workspace_summary=s.uses_workspace_summary, invocation=s.invocation, enabled=s.name in on,
+                 input_schema=SkillInput.model_json_schema(), output_schema=s.output_model.model_json_schema())
         for s in reg.all()
     ]
 
 
-@router.patch("/skills/{name}")
+@router.patch("/skills/{name}", response_model=SkillToggleOut)
 def toggle_skill(name: str, body: SkillPatch, request: Request, db: Session = Depends(get_db)):
     if request.app.state.registry.get(name) is None:
         raise AppError("not_found", "Skill not found.", 404)
@@ -207,22 +248,28 @@ def remove_workspace(ws: Workspace = Depends(get_workspace), db: Session = Depen
     audit(db, "workspace.remove", name=ws.name)
 
 
-@router.get("/workspaces/{workspace_id}/tree")
+@router.get("/workspaces/{workspace_id}/tree", response_model=list[FileEntry])
 def tree(request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
     return execute_tool("list_files", {}, tool_ctx(request, db, ws))
 
 
-@router.get("/workspaces/{workspace_id}/summary")
-def summary(ws: Workspace = Depends(get_workspace)):
-    return wsvc.summarize(ws.path)
+@router.get("/workspaces/{workspace_id}/summary", response_model=WorkspaceSummary)
+def summary(request: Request, ws: Workspace = Depends(get_workspace)):
+    return wsvc.summarize(ws.path, request.app.state.settings.max_file_bytes)
 
 
-@router.get("/workspaces/{workspace_id}/search")
+@router.get("/workspaces/{workspace_id}/search", response_model=list[SearchHit])
 def search(q: str, request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
     return execute_tool("search_files", {"query": q}, tool_ctx(request, db, ws))
 
 
-@router.get("/workspaces/{workspace_id}/file")
+@router.get("/workspaces/{workspace_id}/suggest", response_model=list[FileSuggestion])
+def suggest(q: str, request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
+    """BE-03: rank files for a question locally. The user picks which ones (if any) to send."""
+    return execute_tool("suggest_files", {"query": q}, tool_ctx(request, db, ws))
+
+
+@router.get("/workspaces/{workspace_id}/file", response_model=FileContent)
 def read_file(path: str, request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
     return execute_tool("read_file", {"path": path}, tool_ctx(request, db, ws))
 
@@ -230,6 +277,27 @@ def read_file(path: str, request: Request, ws: Workspace = Depends(get_workspace
 @router.post("/workspaces/{workspace_id}/changes", response_model=ChangeOut, status_code=201)
 def propose(body: ProposeChangeIn, request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
     return execute_tool("propose_change", body.model_dump(), tool_ctx(request, db, ws))
+
+
+@router.post("/workspaces/{workspace_id}/draft", response_model=DraftOut, status_code=201, dependencies=[Depends(chat_limit)])
+async def draft(body: DraftIn, request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
+    """AI-08: the model drafts new content; it only becomes a proposal."""
+    st = request.app.state
+    return await workflows.run_draft(ws, body, db, st.settings, st.provider, st.registry)
+
+
+# ---------- agent ----------
+@router.post("/workspaces/{workspace_id}/agent/notes", response_model=AgentRunOut, status_code=201, dependencies=[Depends(chat_limit)])
+async def project_notes(body: ProjectNotesIn, request: Request, ws: Workspace = Depends(get_workspace), db: Session = Depends(get_db)):
+    """Read authorized files -> analyze -> draft a notes file -> propose it -> suggest a project memory."""
+    st = request.app.state
+    return await workflows.run_project_notes(ws, body, db, st.settings, st.provider, st.registry)
+
+
+@router.post("/learn/explain", response_model=ComponentExplainOut, dependencies=[Depends(chat_limit)])
+async def explain_component(body: ComponentExplainIn, request: Request, db: Session = Depends(get_db)):
+    st = request.app.state
+    return await workflows.explain_component(body, db, st.settings, st.provider, st.registry)
 
 
 # ---------- changes (approval flow) ----------

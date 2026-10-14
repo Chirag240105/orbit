@@ -1,5 +1,15 @@
 from app.skills.base import Skill
-from app.skills.builtin import ExplainCode, GeneralQA, SummarizeText, TaskPlan
+from app.skills.builtin import (
+    DraftChange,
+    ExplainCode,
+    ExplainComponent,
+    GeneralQA,
+    LearnTopic,
+    ProjectNotes,
+    ProjectOverview,
+    SummarizeText,
+    TaskPlan,
+)
 
 
 class SkillRegistry:
@@ -19,7 +29,12 @@ class SkillRegistry:
 
 
 def default_registry() -> SkillRegistry:
+    """Registration order is the keyword-routing priority for chat skills (first match wins);
+    general_qa has no pattern and is the default."""
     reg = SkillRegistry()
-    for s in (GeneralQA(), SummarizeText(), ExplainCode(), TaskPlan()):
+    for s in (
+        GeneralQA(), ExplainCode(), ProjectOverview(), LearnTopic(), SummarizeText(), TaskPlan(),
+        ProjectNotes(), DraftChange(), ExplainComponent(),
+    ):
         reg.register(s)
     return reg
