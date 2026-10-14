@@ -21,6 +21,7 @@ function SkillCard({ s }: { s: Skill }) {
         <div><dt className="text-muted">Output</dt><dd className="mt-1 font-mono">{fields(s.output_schema).join(", ")}</dd></div>
       </dl>
       {s.requires_files && <p className="mt-2 text-xs text-muted">Needs an authorized workspace and a selected file. Without one, ORBIT asks a clarifying question.</p>}
+      {s.uses_workspace_summary && <p className="mt-2 text-xs text-muted">Reads the project layout (file and dependency names). With a hosted model, ORBIT asks before sending it.</p>}
     </Panel>
   );
 }
@@ -29,11 +30,17 @@ export function SkillsPage() {
   const [q, setQ] = useState("");
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ["skills"], queryFn: api.skills });
   const shown = data?.filter((s) => (s.title + s.description).toLowerCase().includes(q.toLowerCase()));
+  const chat = shown?.filter((s) => s.invocation === "chat") ?? [], workflows = shown?.filter((s) => s.invocation !== "chat") ?? [];
   return (
     <div className="max-w-3xl">
       <PageHeader title="Skills" description="Skills are reusable abilities with a fixed input, a validated output, and declared permissions. Turning a skill on never gives it more access than the permissions listed here." />
       <input aria-label="Search skills" className={`${inputCls} mb-4`} placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} />
-      {isLoading ? <Skeleton className="h-28" /> : error ? <ErrorState error={error} retry={() => refetch()} /> : !shown?.length ? <EmptyState title="No skills match" /> : <div className="space-y-3">{shown.map((s) => <SkillCard key={s.name} s={s} />)}</div>}
+      {isLoading ? <Skeleton className="h-28" /> : error ? <ErrorState error={error} retry={() => refetch()} /> : !shown?.length ? <EmptyState title="No skills match" /> : (
+        <div className="space-y-6">
+          {chat.length > 0 && <section aria-labelledby="chat-skills"><h2 id="chat-skills" className="mb-2 text-sm font-semibold">Chat skills</h2><div className="space-y-3">{chat.map((s) => <SkillCard key={s.name} s={s} />)}</div></section>}
+          {workflows.length > 0 && <section aria-labelledby="workflow-skills"><h2 id="workflow-skills" className="mb-1 text-sm font-semibold">Agent workflows</h2><p className="mb-2 text-xs text-muted">Used by the project agent, AI drafts and Visual Learning. They never run from chat, and every file they touch goes through your approval.</p><div className="space-y-3">{workflows.map((s) => <SkillCard key={s.name} s={s} />)}</div></section>}
+        </div>
+      )}
       <Panel title="Add your own skill" className="mt-6">
         <p className="text-sm text-muted">Skills are Python classes registered in <code className="font-mono">backend/app/skills/registry.py</code>. Follow <code className="font-mono">docs/SKILL_DEVELOPMENT.md</code> and the working example in <code className="font-mono">examples/example-skill</code>. Restart the backend and the new skill appears here.</p>
       </Panel>

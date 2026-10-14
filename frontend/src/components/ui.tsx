@@ -1,24 +1,28 @@
-import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { Link, useInRouterContext } from "react-router-dom";
 import { ApiError } from "../lib/api";
+import { errorHelp } from "../lib/errors";
 
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+export const cx = (...c: (string | false | undefined | null)[]) => c.filter(Boolean).join(" ");
 
-export function Button({ variant = "secondary", className, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
-  const v = {
-    primary: "bg-accent text-bg hover:brightness-110",
-    secondary: "bg-raised text-text border border-line hover:border-muted",
-    danger: "bg-danger/15 text-danger border border-danger/40 hover:bg-danger/25",
-    ghost: "text-muted hover:text-text hover:bg-raised",
-  }[variant];
-  return <button {...p} className={cx("rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed", v, className)} />;
-}
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" };
+const VARIANTS = {
+  primary: "bg-accent text-bg hover:brightness-110",
+  secondary: "bg-raised text-text border border-line hover:border-muted",
+  danger: "bg-danger/15 text-danger border border-danger/40 hover:bg-danger/20",
+  ghost: "text-muted hover:text-text hover:bg-raised",
+};
 
-export function Panel({ title, action, children, className }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = "secondary", className, type = "button", ...p }, ref) {
+  return <button ref={ref} type={type} {...p} className={cx("rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40", VARIANTS[variant], className)} />;
+});
+
+export function Panel({ title, action, children, className }: { title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx("rounded-lg border border-line bg-surface", className)}>
+    <section className={cx("min-w-0 rounded-lg border border-line bg-surface", className)}>
       {title && (
-        <header className="flex items-center justify-between border-b border-line px-4 py-2.5">
-          <h2 className="text-sm font-semibold">{title}</h2>
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+          <h2 className="min-w-0 truncate text-sm font-semibold">{title}</h2>
           {action}
         </header>
       )}
@@ -29,8 +33,8 @@ export function Panel({ title, action, children, className }: { title?: string; 
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
-    <div className="mb-5 flex items-start justify-between gap-4">
-      <div>
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div className="min-w-0">
         <h1 className="text-xl font-semibold">{title}</h1>
         {description && <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>}
       </div>
@@ -54,13 +58,26 @@ export function EmptyState({ title, children, action }: { title: string; childre
   );
 }
 
+/** Renders `code` spans written with backticks. */
+const withCode = (s: string) => s.split("`").map((part, i) => (i % 2 ? <code key={i} className="font-mono">{part}</code> : part));
+
 export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
   const e = error instanceof ApiError ? error : null;
+  const help = errorHelp(e?.code);
+  const inRouter = useInRouterContext();
   return (
     <div role="alert" className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-sm">
-      <p className="font-medium text-danger">{e?.code === "backend_unreachable" ? "Backend not reachable" : "Something went wrong"}</p>
+      <p className="font-medium text-danger">{help.title}</p>
       <p className="mt-1 text-text/90">{e?.message ?? "Unexpected error."}</p>
-      {retry && <Button className="mt-3" onClick={retry}>Try again</Button>}
+      {help.hint && <p className="mt-1 text-text/80">{withCode(help.hint)}</p>}
+      {((retry && help.retry) || help.link) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {retry && help.retry && <Button onClick={retry}>Try again</Button>}
+          {help.link && (inRouter
+            ? <Link to={help.link.to} className="rounded-md border border-line px-3 py-1.5 font-medium hover:border-muted">{help.link.label}</Link>
+            : <a href={help.link.to} className="rounded-md border border-line px-3 py-1.5 font-medium">{help.link.label}</a>)}
+        </div>
+      )}
     </div>
   );
 }
@@ -75,25 +92,37 @@ export function Field({ label, children }: { label: string; children: ReactNode 
     </label>
   );
 }
-export const inputCls = "w-full rounded-md border border-line bg-bg px-3 py-2 text-sm placeholder:text-muted/70 focus:border-accent";
+export const inputCls = "w-full rounded-md border border-line bg-bg px-3 py-2 text-sm placeholder:text-muted focus:border-accent";
 
+/** Modal confirmation. The native <dialog> traps focus and closes on Escape; destructive dialogs focus Cancel first. */
 export function ConfirmDialog({ open, title, body, confirmLabel, danger, onConfirm, onCancel }: { open: boolean; title: string; body: ReactNode; confirmLabel: string; danger?: boolean; onConfirm: () => void; onCancel: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const d = ref.current;
-    if (!d) return;
-    if (open && !d.open) d.showModal?.() ?? d.setAttribute("open", "");
-    if (!open && d.open) d.close?.();
-  }, [open]);
+    if (!d || !open) return;
+    const opener = document.activeElement as HTMLElement | null;
+    if (!d.open) {
+      if (typeof d.showModal === "function") d.showModal();
+      else d.setAttribute("open", "");
+    }
+    (danger ? cancelRef : confirmRef).current?.focus();
+    return () => opener?.focus?.(); // give focus back to whatever opened the dialog
+  }, [open, danger]);
   if (!open) return null;
   return (
-    <dialog ref={ref} onCancel={(e) => { e.preventDefault(); onCancel(); }} aria-labelledby="dlg-title" className="m-auto w-[min(28rem,92vw)] rounded-lg border border-line bg-surface p-5 text-text backdrop:bg-black/60">
+    <dialog ref={ref} onCancel={(e) => { e.preventDefault(); onCancel(); }} aria-labelledby="dlg-title" aria-describedby="dlg-body" className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-5 text-text backdrop:bg-black/60">
       <h2 id="dlg-title" className="font-semibold">{title}</h2>
-      <div className="mt-2 text-sm text-muted">{body}</div>
+      <div id="dlg-body" className="mt-2 text-sm text-muted">{body}</div>
       <div className="mt-5 flex justify-end gap-2">
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>{confirmLabel}</Button>
+        <Button ref={cancelRef} onClick={onCancel}>Cancel</Button>
+        <Button ref={confirmRef} variant={danger ? "danger" : "primary"} onClick={onConfirm}>{confirmLabel}</Button>
       </div>
     </dialog>
   );
+}
+
+export function SkipLink() {
+  return <a href="#main" className="sr-only z-50 rounded-md bg-accent px-3 py-2 text-sm font-medium text-bg focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>;
 }

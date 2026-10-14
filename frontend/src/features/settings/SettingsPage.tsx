@@ -23,11 +23,13 @@ export function SettingsPage() {
     <div className="max-w-3xl space-y-5">
       <PageHeader title="Settings and Privacy" description="See what ORBIT can access, what leaves your computer, and how to remove what it stores." />
       <Panel title="Model provider and backend">
-        {health.error ? <ErrorState error={health.error} retry={() => health.refetch()} /> : !health.data || !p ? <Skeleton className="h-12" /> : (
-          <dl className="grid grid-cols-[9rem_1fr] gap-y-2 text-sm">
+        {health.error || info.error ? <ErrorState error={health.error ?? info.error} retry={() => { health.refetch(); info.refetch(); }} /> : !health.data || !p ? <Skeleton className="h-12" /> : (
+          <dl className="grid grid-cols-1 gap-y-1 text-sm sm:grid-cols-[9rem_1fr] sm:gap-y-2">
             <dt className="text-muted">Backend</dt><dd><Badge color="ok">Healthy</Badge> v{health.data.version}, database {health.data.database}</dd>
             <dt className="text-muted">Provider</dt><dd>{p.is_demo ? <Badge color="warn">Demo mode: no model, no network</Badge> : p.configured ? <><Badge color="ok">Configured</Badge> {p.name}, <span className="font-mono">{p.model}</span></> : <Badge color="warn">Not configured</Badge>}</dd>
             <dt className="text-muted">API key</dt><dd className="text-muted">Held by the backend only. It is never sent to this page. Set it in <code className="font-mono">.env</code>.</dd>
+            <dt className="text-muted">Skill routing</dt><dd>{info.data?.model_routing ? "The model picks a skill when you don't (one extra call)" : "Keywords pick a skill when you don't"} <span className="text-muted">(ORBIT_MODEL_ROUTING)</span></dd>
+            <dt className="text-muted">Local access</dt><dd className="text-muted">Every API call needs a token the backend generates at start. The dev server adds it, so other programs and websites can't use the API.</dd>
             <dt className="text-muted">Limits</dt><dd>{info.data && `${kb(info.data.limits.max_file_bytes)} per file, ${info.data.limits.max_context_chars.toLocaleString()} characters of file context per request`}</dd>
           </dl>
         )}
@@ -40,8 +42,8 @@ export function SettingsPage() {
       </Panel>
       <Panel title="Tool permissions">
         <p className="mb-3 text-sm text-muted">Tools are checked by the backend on every call. The model cannot run shell commands or reach files outside an authorized workspace.</p>
-        <table className="w-full text-left text-sm"><thead className="text-xs text-muted"><tr><th className="pb-1 font-medium">Tool</th><th className="pb-1 font-medium">Needs</th><th className="pb-1 font-medium">Confirmation</th></tr></thead>
-          <tbody>{info.data?.tools.map((t) => <tr key={t.name} className="border-t border-line"><td className="py-1.5"><span className="font-mono text-xs">{t.name}</span><span className="block text-xs text-muted">{t.description}</span></td><td>{t.permissions.map((x) => <Badge key={x}>{x}</Badge>)}</td><td>{t.requires_confirmation ? "Required each time" : "Not needed"}</td></tr>)}</tbody></table>
+        <div className="overflow-x-auto"><table className="w-full min-w-[28rem] text-left text-sm"><thead className="text-xs text-muted"><tr><th className="pb-1 font-medium">Tool</th><th className="pb-1 font-medium">Needs</th><th className="pb-1 font-medium">Confirmation</th></tr></thead>
+          <tbody>{info.data?.tools.map((t) => <tr key={t.name} className="border-t border-line"><td className="py-1.5"><span className="font-mono text-xs">{t.name}</span><span className="block text-xs text-muted">{t.description}</span></td><td>{t.permissions.map((x) => <Badge key={x}>{x}</Badge>)}</td><td>{t.requires_confirmation ? "Required each time" : "Not needed"}</td></tr>)}</tbody></table></div>
       </Panel>
       <Panel title="Camera">
         <p className="text-sm">Browser permission: <Badge color={cam === "granted" ? "warn" : "neutral"}>{cam}</Badge></p>

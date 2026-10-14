@@ -9,7 +9,7 @@
   --color-muted: #8a94aa;
   --color-accent: #6c9eff;
   --color-warn: #e3b25c;
-  --color-danger: #f0706a;
+  --color-danger: #f37c74; /* lightened from #f0706a so danger badges on raised panels meet WCAG AA */
   --color-ok: #5fc59a;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -21,3 +21,7 @@ body { background: var(--color-bg); color: var(--color-text); font-family: var(-
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 @keyframes pulse-dot { 50% { opacity: .35; } }
 .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+@media print {
+  nav[aria-label="Primary"], header { display: none !important; }
+  body, #root, main { background: #fff !important; color: #000 !important; overflow: visible !important; height: auto !important; }
+}

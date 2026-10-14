@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet } from "react-router-dom";
 import { api } from "../lib/api";
-import { Badge } from "../components/ui";
+import { Badge, SkipLink } from "../components/ui";
 import { useActiveWorkspace } from "./WorkspaceContext";
 
 const NAV = [
@@ -25,6 +25,7 @@ export function Shell() {
   const active = workspaces?.find((w) => w.id === activeId);
   return (
     <div className="flex h-full flex-col md:flex-row">
+      <SkipLink />
       <nav aria-label="Primary" className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface p-2 md:w-56 md:flex-col md:border-b-0 md:border-r md:p-3">
         <div className="hidden px-2 pb-3 pt-1 md:block">
           <p className="text-lg font-semibold tracking-tight">ORBIT</p>
@@ -37,10 +38,10 @@ export function Shell() {
         ))}
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-2.5 text-sm">
-          <div className="flex items-center gap-2">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5 text-sm md:px-5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="text-muted">Workspace</span>
-            <select aria-label="Active workspace" value={activeId ?? ""} onChange={(e) => setActiveId(e.target.value ? Number(e.target.value) : null)} className="rounded-md border border-line bg-bg px-2 py-1">
+            <select aria-label="Active workspace" value={activeId ?? ""} onChange={(e) => setActiveId(e.target.value ? Number(e.target.value) : null)} className="max-w-[12rem] rounded-md border border-line bg-bg px-2 py-1">
               <option value="">None authorized</option>
               {workspaces?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
@@ -48,7 +49,7 @@ export function Shell() {
           </div>
           <AgentStatus />
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto p-5"><Outlet /></main>
+        <main id="main" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 focus:outline-none md:p-5"><Outlet /></main>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useActiveWorkspace } from "../../app/WorkspaceContext";
-import { Badge, EmptyState, PageHeader, Panel, Skeleton } from "../../components/ui";
+import { Badge, EmptyState, ErrorState, PageHeader, Panel, Skeleton } from "../../components/ui";
 import { api } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 
@@ -15,18 +15,20 @@ export function HomePage() {
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks });
   const proposed = tasks.data?.filter((t) => t.status === "proposed") ?? [];
   const pending = (changes.data?.length ?? 0) + proposed.length;
+  const failed = [convs, ws, changes, tasks].find((q) => q.error);
 
   return (
     <div className="max-w-5xl">
       <PageHeader title="Welcome to ORBIT" description="One personal agent with memory you control, skills with declared permissions, and access only to the folders you authorize." />
+      {failed && <div className="mb-5"><ErrorState error={failed.error} retry={() => [convs, ws, changes, tasks].forEach((q) => q.refetch())} /></div>}
       <div className="mb-6 grid gap-3 md:grid-cols-3">
-        <Link to="/chat" className={linkCls}><p className="font-medium">Start a chat</p><p className="mt-1 text-sm text-muted">Ask, summarize, or plan.</p></Link>
-        <Link to="/projects" className={linkCls}><p className="font-medium">Inspect a project</p><p className="mt-1 text-sm text-muted">Authorize a folder, then search and explain files.</p></Link>
-        <Link to="/visual" className={linkCls}><p className="font-medium">Open Visual Learning Studio</p><p className="mt-1 text-sm text-muted">Explore a 3D cloud architecture.</p></Link>
+        <Link to="/chat" className={linkCls}><p className="font-medium">Start a chat</p><p className="mt-1 text-sm text-muted">Ask, learn a topic, summarize, or plan.</p></Link>
+        <Link to="/projects" className={linkCls}><p className="font-medium">Inspect a project</p><p className="mt-1 text-sm text-muted">Authorize a folder, explain files, and let the project agent write notes for your approval.</p></Link>
+        <Link to="/visual" className={linkCls}><p className="font-medium">Open Visual Learning Studio</p><p className="mt-1 text-sm text-muted">Explore 3D system scenes, or show a printed marker to the camera.</p></Link>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Panel title="Waiting for your approval">
-          {changes.isLoading ? <Skeleton /> : pending === 0 ? <p className="text-sm text-muted">Nothing is waiting. File changes and AI-proposed tasks appear here first.</p> : (
+          {changes.isLoading || tasks.isLoading ? <Skeleton /> : failed ? <p className="text-sm text-muted">Unavailable while the backend is unreachable.</p> : pending === 0 ? <p className="text-sm text-muted">Nothing is waiting. File changes and AI-proposed tasks appear here first.</p> : (
             <ul className="space-y-2 text-sm">
               {changes.data?.map((c) => <li key={`c${c.id}`}><Link className="hover:underline" to="/projects"><Badge color="warn">File change</Badge> <span className="font-mono text-xs">{c.rel_path}</span></Link></li>)}
               {proposed.map((t) => <li key={`t${t.id}`}><Link className="hover:underline" to="/tasks"><Badge color="warn">Task</Badge> {t.title}</Link></li>)}
@@ -35,7 +37,7 @@ export function HomePage() {
         </Panel>
         <Panel title="Recent conversations">
           {convs.isLoading ? <Skeleton /> : convs.data?.length ? (
-            <ul className="space-y-1.5 text-sm">{convs.data.slice(0, 5).map((c) => <li key={c.id} className="flex justify-between gap-3"><Link className="truncate hover:underline" to="/chat">{c.title}</Link><span className="shrink-0 text-xs text-muted">{timeAgo(c.updated_at)}</span></li>)}</ul>
+            <ul className="space-y-1.5 text-sm">{convs.data.slice(0, 5).map((c) => <li key={c.id} className="flex justify-between gap-3"><Link className="truncate hover:underline" to="/chat" state={{ conversationId: c.id }}>{c.title}</Link><span className="shrink-0 text-xs text-muted">{timeAgo(c.updated_at)}</span></li>)}</ul>
           ) : <p className="text-sm text-muted">No conversations yet.</p>}
         </Panel>
         <Panel title="Projects" className="md:col-span-2">

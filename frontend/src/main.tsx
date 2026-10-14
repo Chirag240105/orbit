@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Shell } from "./app/Shell";
@@ -11,8 +11,17 @@ import { ProjectsPage } from "./features/projects/ProjectsPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { SkillsPage } from "./features/skills/SkillsPage";
 import { TasksPage } from "./features/tasks/TasksPage";
-import { VisualLearningPage } from "./features/visual-learning/VisualLearningPage";
+// Self-hosted fonts (FE-01): bundled by Vite, no CDN request at runtime.
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-mono/400.css";
 import "./styles/index.css";
+
+// three.js is ~1 MB: load the 3D studio only when it is opened.
+const VisualLearningPage = lazy(() => import("./features/visual-learning/VisualLearningPage").then((m) => ({ default: m.VisualLearningPage })));
+const MarkersPage = lazy(() => import("./features/visual-learning/MarkersPage").then((m) => ({ default: m.MarkersPage })));
+const loading = <p className="text-sm text-muted">Loading…</p>;
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 
@@ -26,7 +35,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route index element={<HomePage />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="projects" element={<ProjectsPage />} />
-              <Route path="visual" element={<VisualLearningPage />} />
+              <Route path="visual" element={<Suspense fallback={loading}><VisualLearningPage /></Suspense>} />
+              <Route path="visual/markers" element={<Suspense fallback={loading}><MarkersPage /></Suspense>} />
               <Route path="memory" element={<MemoryPage />} />
               <Route path="skills" element={<SkillsPage />} />
               <Route path="tasks" element={<TasksPage />} />
