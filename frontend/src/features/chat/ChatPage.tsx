@@ -4,7 +4,9 @@ import { useLocation } from "react-router-dom";
 import { useActiveWorkspace } from "../../app/WorkspaceContext";
 import { ConsentDialog } from "../../components/ConsentDialog";
 import { FilePicker } from "../../components/FilePicker";
-import { Button, ConfirmDialog, EmptyState, ErrorState, PageHeader, inputCls } from "../../components/ui";
+import { LogoMark } from "../../components/Logo";
+import { Icon, type IconName } from "../../components/icons";
+import { Button, ConfirmDialog, ErrorState, PageHeader, cx } from "../../components/ui";
 import { api, consentDetails, type ConsentDetails } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 import { streamPreview } from "../../lib/preview";
@@ -13,6 +15,12 @@ import { OutputView } from "./OutputView";
 
 type NavState = { file?: string; prompt?: string; conversationId?: number } | null;
 const STATUS: Record<string, string> = { thinking: "The model is reasoning…", validating: "Checking the answer's structure…" };
+const SUGGESTIONS: [IconName, string, string][] = [
+  ["sparkle", "Learn a topic", "Explain Kubernetes like I'm a beginner, with a diagram and interview questions"],
+  ["tasks", "Plan a goal", "Plan how to launch my side project in 4 weeks"],
+  ["memory", "Summarize", "Summarize the key ideas of retrieval-augmented generation in five bullet points"],
+  ["cube", "Explain a system", "How does a CPU cache work, and why does it make programs faster?"],
+];
 
 export function ChatPage() {
   const qc = useQueryClient();
@@ -80,22 +88,22 @@ export function ChatPage() {
   const preview = live ? streamPreview(live.raw) : "";
 
   return (
-    <div className="flex h-full min-h-[32rem] flex-col gap-4 lg:flex-row">
-      <aside className="w-full shrink-0 lg:w-60" aria-label="Conversations">
-        <Button className="mb-3 w-full" onClick={() => { abort.current?.abort(); setConvId(null); setThread([]); setError(null); }}>New conversation</Button>
+    <div className="flex h-full min-h-[22rem] flex-col gap-4 md:flex-row">
+      <aside className="w-full shrink-0 md:w-52 lg:w-60" aria-label="Conversations">
+        <Button className="mb-3 w-full" onClick={() => { abort.current?.abort(); setConvId(null); setThread([]); setError(null); }}><Icon name="plus" />New conversation</Button>
         {convs.isLoading ? null : convs.error ? <ErrorState error={convs.error} retry={() => convs.refetch()} /> : convs.data?.length ? (
-          <ul className="max-h-48 space-y-1 overflow-y-auto lg:max-h-none">
+          <ul className="max-h-48 space-y-1 overflow-y-auto md:max-h-none">
             {convs.data.map((c) => (
-              <li key={c.id} className={`group flex items-center rounded-md hover:bg-raised ${c.id === convId ? "bg-raised" : ""}`}>
-                <button onClick={() => open(c.id)} aria-current={c.id === convId ? "true" : undefined} className="min-w-0 flex-1 px-3 py-2 text-left text-sm"><span className="line-clamp-1 break-all">{c.title}</span><span className="text-xs text-muted">{timeAgo(c.updated_at)}</span></button>
+              <li key={c.id} className={cx("group flex items-center rounded-lg border border-transparent hover:bg-raised", c.id === convId && "border-line bg-raised")}>
+                <button onClick={() => open(c.id)} aria-current={c.id === convId ? "true" : undefined} className="min-w-0 flex-1 px-3 py-2 text-left text-sm"><span className="line-clamp-1 break-all">{c.title}</span><span className="block text-xs text-muted">{timeAgo(c.updated_at)}</span></button>
                 <button aria-label={`Delete conversation ${c.title}`} onClick={() => setRemove(c)} className="mr-1 rounded px-2 py-1 text-muted opacity-60 hover:text-danger group-hover:opacity-100 focus:opacity-100">×</button>
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-muted">No conversations yet.</p>}
+        ) : <p className="px-1 text-sm text-muted">No conversations yet.</p>}
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <PageHeader title="AI Workspace" description="Ask a question, learn a topic, summarize text, plan a goal, or explain your project. ORBIT picks a skill, or you can choose one." />
+        <PageHeader title="AI Workspace" description="Ask, learn a topic, summarize, plan, or explain your project. ORBIT picks a skill, or you choose one." />
         {blocked && (
           <div role="status" className="mb-3 rounded-lg border border-warn/40 bg-warn/10 p-4 text-sm">
             <p className="font-medium text-warn">No model is configured</p>
@@ -103,15 +111,32 @@ export function ChatPage() {
           </div>
         )}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite" aria-busy={busy}>
-          {thread.length === 0 && !busy && <EmptyState title="Start a conversation">Try "Explain Kubernetes like I'm a beginner, with a diagram and interview questions" or "Plan how to launch my side project in 4 weeks".</EmptyState>}
+          {thread.length === 0 && !busy && (
+            // Compact on purpose: the starters must fit above the composer without scrolling, even in short windows
+            <div className="!mb-0 flex min-h-full flex-col items-center justify-center py-1">
+              <div className="mb-3 flex items-center gap-2.5 [@media(max-height:620px)]:hidden">
+                <LogoMark className="h-7 w-7" />
+                <p className="font-semibold">Start a conversation</p>
+                <p className="hidden text-sm text-muted sm:block">· pick a starter or write your own</p>
+              </div>
+              <div className="grid w-full max-w-3xl gap-2 text-left sm:grid-cols-2">
+                {SUGGESTIONS.map(([icon, label, prompt]) => (
+                  <button key={label} type="button" title={prompt} onClick={() => { setText(prompt); document.getElementById("msg")?.focus(); }} className="group flex min-w-0 items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-accent/60 hover:bg-raised">
+                    <span className="shrink-0 rounded-lg bg-accent/10 p-1.5 text-accent"><Icon name={icon} /></span>
+                    <span className="min-w-0"><span className="block text-sm font-medium">{label}</span><span className="block truncate text-xs text-muted">{prompt}</span></span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {thread.map((m) => (
-            <div key={m.id} className={m.role === "user" ? "ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-raised px-4 py-2.5 text-sm" : "max-w-full rounded-lg border border-line bg-surface px-4 py-3 sm:max-w-[92%]"}>
+            <div key={m.id} className={m.role === "user" ? "ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md border border-accent/25 bg-accent/10 px-4 py-2.5 text-sm" : "max-w-full rounded-2xl rounded-bl-md border border-line bg-surface px-4 py-3 shadow-sm shadow-black/5 sm:max-w-[92%]"}>
               {m.role === "user" ? String(m.content) : <OutputView msg={m} />}
             </div>
           ))}
           {busy && (
-            <div className="max-w-full rounded-lg border border-dashed border-line px-4 py-3 sm:max-w-[92%]" data-testid="live-answer">
-              <p className="mb-1 text-xs text-muted">{STATUS[live.status] ?? (preview ? "Receiving (not yet validated)…" : "ORBIT is working…")}</p>
+            <div className="max-w-full rounded-2xl rounded-bl-md border border-dashed border-accent/40 bg-surface/60 px-4 py-3 sm:max-w-[92%]" data-testid="live-answer">
+              <p className="mb-1 flex items-center gap-2 text-xs text-muted"><span aria-hidden className="pulse-dot h-1.5 w-1.5 rounded-full bg-accent" />{STATUS[live.status] ?? (preview ? "Receiving (not yet validated)…" : "ORBIT is working…")}</p>
               {preview && <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text/90">{preview}</p>}
               <Button variant="ghost" className="mt-2" onClick={() => abort.current?.abort()}>Stop</Button>
             </div>
@@ -119,21 +144,24 @@ export function ChatPage() {
           {error != null && <ErrorState error={error} />}
           <div ref={end} />
         </div>
-        <div className="mt-3 rounded-lg border border-line bg-surface p-3">
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-2.5 shadow-sm shadow-black/5 transition-colors focus-within:border-accent/60">
           <label htmlFor="msg" className="sr-only">Message</label>
-          <textarea id="msg" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(); }} rows={3} placeholder="Message ORBIT (Ctrl+Enter to send)" className={inputCls} />
+          <textarea id="msg" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => {
+            // Enter sends, Shift+Enter adds a line; ignore Enter while an IME is composing text
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
+          }} rows={2} placeholder="Message ORBIT (Enter to send, Shift+Enter for a new line)" className="w-full resize-none bg-transparent px-2 py-1.5 text-sm placeholder:text-muted focus:outline-none" />
           {showFiles && activeId && <div className="mt-2"><FilePicker workspaceId={activeId} question={text} selected={files} onChange={setFiles} /></div>}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <select aria-label="Skill" value={skill} onChange={(e) => setSkill(e.target.value)} className="max-w-full rounded-md border border-line bg-bg px-2 py-1.5 text-sm">
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line pt-2.5">
+            <select aria-label="Skill" value={skill} onChange={(e) => setSkill(e.target.value)} className="max-w-full rounded-lg border border-line bg-bg px-2.5 py-1.5 text-sm hover:border-muted">
               <option value="">Skill: automatic</option>
               {skills.data?.filter((s) => s.enabled && s.invocation === "chat").map((s) => <option key={s.name} value={s.name}>{s.title}</option>)}
             </select>
             <Button variant="ghost" aria-expanded={showFiles} disabled={!activeId} title={activeId ? undefined : "Authorize a workspace in Projects to attach files"} onClick={() => setShowFiles((v) => !v)}>
-              {files.length && activeId ? `Files (${files.length})` : "Attach files"}
+              <Icon name="paperclip" />{files.length && activeId ? `Files (${files.length})` : "Attach files"}
             </Button>
             {busy
               ? <Button variant="danger" className="ml-auto" onClick={() => abort.current?.abort()}>Stop</Button>
-              : <Button variant="primary" className="ml-auto" disabled={blocked || !text.trim()} onClick={submit}>Send</Button>}
+              : <Button variant="primary" className="ml-auto" disabled={blocked || !text.trim()} onClick={submit}>Send<Icon name="send" /></Button>}
           </div>
         </div>
       </div>

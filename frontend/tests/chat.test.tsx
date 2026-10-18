@@ -96,3 +96,21 @@ it("disables Send when no model is configured", async () => {
   fireEvent.change(screen.getByLabelText("Message"), { target: { value: "hi" } });
   await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeDisabled());
 });
+
+it("Enter sends the message; Shift+Enter does not", async () => {
+  base();
+  const bodies: unknown[] = [];
+  server.use(http.post(api("/chat/stream"), async ({ request }) => {
+    bodies.push(await request.json());
+    return new HttpResponse(sseStream([["done", DONE]]), { headers: { "content-type": "text/event-stream" } });
+  }));
+  renderPage(<ChatPage />);
+  const box = screen.getByLabelText("Message");
+  fireEvent.change(box, { target: { value: "Teach me Kubernetes" } });
+  fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
+  expect(box).toHaveValue("Teach me Kubernetes");
+  fireEvent.keyDown(box, { key: "Enter" });
+  expect(await screen.findByText("Kubernetes runs containers for you.")).toBeInTheDocument();
+  expect(bodies).toHaveLength(1);
+  expect(box).toHaveValue("");
+});

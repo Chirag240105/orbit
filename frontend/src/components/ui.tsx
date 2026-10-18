@@ -7,21 +7,21 @@ export const cx = (...c: (string | false | undefined | null)[]) => c.filter(Bool
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" };
 const VARIANTS = {
-  primary: "bg-accent text-bg hover:brightness-110",
-  secondary: "bg-raised text-text border border-line hover:border-muted",
+  primary: "bg-brand text-on-brand shadow-sm shadow-brand/20 hover:brightness-110",
+  secondary: "bg-surface text-text border border-line hover:border-muted hover:bg-raised",
   danger: "bg-danger/15 text-danger border border-danger/40 hover:bg-danger/20",
   ghost: "text-muted hover:text-text hover:bg-raised",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = "secondary", className, type = "button", ...p }, ref) {
-  return <button ref={ref} type={type} {...p} className={cx("rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40", VARIANTS[variant], className)} />;
+  return <button ref={ref} type={type} {...p} className={cx("inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-[color,background-color,border-color,filter] disabled:cursor-not-allowed disabled:opacity-40", VARIANTS[variant], className)} />;
 });
 
 export function Panel({ title, action, children, className }: { title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx("min-w-0 rounded-lg border border-line bg-surface", className)}>
+    <section className={cx("min-w-0 rounded-xl border border-line bg-surface shadow-sm shadow-black/5", className)}>
       {title && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
           <h2 className="min-w-0 truncate text-sm font-semibold">{title}</h2>
           {action}
         </header>
@@ -35,7 +35,7 @@ export function PageHeader({ title, description, action }: { title: string; desc
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description && <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>}
       </div>
       {action}
@@ -45,12 +45,12 @@ export function PageHeader({ title, description, action }: { title: string; desc
 
 const tone = { neutral: "bg-raised text-muted", accent: "bg-accent/15 text-accent", warn: "bg-warn/15 text-warn", ok: "bg-ok/15 text-ok", danger: "bg-danger/15 text-danger" };
 export function Badge({ children, color = "neutral" }: { children: ReactNode; color?: keyof typeof tone }) {
-  return <span className={cx("inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium", tone[color])}>{children}</span>;
+  return <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", tone[color])}>{children}</span>;
 }
 
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-line px-6 py-10 text-center">
+    <div className="rounded-xl border border-dashed border-line bg-surface/40 px-6 py-10 text-center">
       <p className="font-medium">{title}</p>
       {children && <p className="mx-auto mt-1 max-w-md text-sm text-muted">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -66,7 +66,7 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
   const help = errorHelp(e?.code);
   const inRouter = useInRouterContext();
   return (
-    <div role="alert" className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-sm">
+    <div role="alert" className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm">
       <p className="font-medium text-danger">{help.title}</p>
       <p className="mt-1 text-text/90">{e?.message ?? "Unexpected error."}</p>
       {help.hint && <p className="mt-1 text-text/80">{withCode(help.hint)}</p>}
@@ -92,7 +92,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
     </label>
   );
 }
-export const inputCls = "w-full rounded-md border border-line bg-bg px-3 py-2 text-sm placeholder:text-muted focus:border-accent";
+export const inputCls = "w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm placeholder:text-muted transition-colors hover:border-muted focus:border-accent";
 
 /** Modal confirmation. The native <dialog> traps focus and closes on Escape; destructive dialogs focus Cancel first. */
 export function ConfirmDialog({ open, title, body, confirmLabel, danger, onConfirm, onCancel }: { open: boolean; title: string; body: ReactNode; confirmLabel: string; danger?: boolean; onConfirm: () => void; onCancel: () => void }) {
@@ -112,7 +112,7 @@ export function ConfirmDialog({ open, title, body, confirmLabel, danger, onConfi
   }, [open, danger]);
   if (!open) return null;
   return (
-    <dialog ref={ref} onCancel={(e) => { e.preventDefault(); onCancel(); }} aria-labelledby="dlg-title" aria-describedby="dlg-body" className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-5 text-text backdrop:bg-black/60">
+    <dialog ref={ref} onCancel={(e) => { e.preventDefault(); onCancel(); }} aria-labelledby="dlg-title" aria-describedby="dlg-body" className="m-auto w-[min(30rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-5 text-text shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm">
       <h2 id="dlg-title" className="font-semibold">{title}</h2>
       <div id="dlg-body" className="mt-2 text-sm text-muted">{body}</div>
       <div className="mt-5 flex justify-end gap-2">
@@ -124,5 +124,5 @@ export function ConfirmDialog({ open, title, body, confirmLabel, danger, onConfi
 }
 
 export function SkipLink() {
-  return <a href="#main" className="sr-only z-50 rounded-md bg-accent px-3 py-2 text-sm font-medium text-bg focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>;
+  return <a href="#main" className="sr-only z-50 rounded-md bg-brand px-3 py-2 text-sm font-medium text-on-brand focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>;
 }

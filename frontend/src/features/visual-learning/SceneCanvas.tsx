@@ -38,7 +38,7 @@ function Part({ c, selected, dimmed, onSelect }: { c: SceneComponent; selected: 
       </mesh>
       {!dimmed && (
         <Html position={[0, c.size[1] / 2 + 0.45, 0]} center distanceFactor={13} zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-          <div className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[12px] leading-tight ${selected ? "bg-accent text-black" : "bg-black/75 text-white"}`}>{c.label}</div>
+          <div className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[12px] leading-tight ${selected ? "bg-[#76b900] text-black" : "bg-black/75 text-white"}`}>{c.label}</div>
         </Html>
       )}
     </group>
@@ -88,18 +88,18 @@ export function SceneCanvas({ scene, selectedId, isolatedId, view, viewKey, onSe
   return (
     <Boundary>
       <Canvas camera={{ position: scene.camera.position, fov: 45 }} onCreated={onReady} aria-label={`Interactive 3D scene: ${scene.title}. Use the parts list for keyboard access.`}>
-        <color attach="background" args={["#0b0f17"]} />
+        <color attach="background" args={["#0a0c0b"]} />
         <ambientLight intensity={0.7} />
         <directionalLight position={[6, 10, 5]} intensity={1.1} />
         <mesh position={scene.region.center} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={scene.region.size} />
-          <meshStandardMaterial color="#6c9eff" transparent opacity={0.07} />
+          <meshStandardMaterial color="#76b900" transparent opacity={0.06} />
         </mesh>
         {/* front-left corner: nearest the default camera and away from the components */}
         <Html position={scene.region.labelAt ?? [scene.region.center[0] - scene.region.size[0] / 2 + 0.3, 0.1, scene.region.center[2] + scene.region.size[1] / 2 - 0.3]} style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap text-[11px] text-accent">{scene.region.label}</div>
+          <div className="whitespace-nowrap text-[11px] text-[#76b900]">{scene.region.label}</div>
         </Html>
-        <gridHelper args={[26, 26, "#2a3448", "#1b2333"]} position={[0, -0.06, 0]} />
+        <gridHelper args={[26, 26, "#2c322d", "#181c19"]} position={[0, -0.06, 0]} />
         {scene.components.flatMap((c) => c.connectsTo.map((t) => (
           <Line key={`${c.id}-${t}`} points={[c.position, byId[t].position]} color="#566180" lineWidth={1} transparent opacity={isolatedId && isolatedId !== c.id && isolatedId !== t ? 0.1 : 0.7} />
         )))}

@@ -96,6 +96,25 @@ describe("Shell navigation (FE-02)", () => {
   });
 });
 
+describe("Collapsible sidebar", () => {
+  beforeEach(() => localStorage.clear());
+  it("starts as an icon rail on the AI Workspace, keeps labelled links, and expands from the logo", async () => {
+    server.use(ok("/health", HEALTH), ok("/workspaces", []));
+    renderPage(<Shell />, { route: "/chat" });
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    expect(within(nav).getByRole("link", { name: "AI Workspace" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).queryByRole("button", { name: "Collapse sidebar" })).toBeNull();
+    fireEvent.click(within(nav).getByRole("button", { name: "Expand sidebar" }));
+    expect(within(nav).getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
+    expect(localStorage.getItem("orbit-nav-chat")).toBe("expanded");
+  });
+  it("starts expanded on other pages", () => {
+    server.use(ok("/health", HEALTH), ok("/workspaces", []));
+    renderPage(<Shell />, { route: "/memory" });
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
+  });
+});
+
 describe("FileTree (FE-06)", () => {
   const files = [{ path: "src/app/main.py", size: 100 }, { path: "src/util.py", size: 50 }, { path: "README.md", size: 10 }];
   it("starts collapsed, expands folders, and selects files", () => {
