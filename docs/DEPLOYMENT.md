@@ -9,7 +9,7 @@
 | Tauri desktop app | Native folder picker (SEC-02), tray icon, closer to "always-on" | Needs Rust and a Python sidecar (PyInstaller) per OS, plus signing; roughly 2–4 days of packaging work and new failure modes, with 15 days left before the deadline |
 | Docker Compose | One command | The container can only see mounted folders, which breaks "authorize any folder"; Docker Desktop is heavy for a personal assistant |
 
-Rationale: judges weigh a complete, working product. Packaging risk is better spent on AI-01 (the live model) and the demo. If time remains after DEMO-01, try Tauri on one OS and keep the web app as the fallback.
+Rationale: a complete, working product matters more than packaging right now. Packaging risk is better spent on AI-01 (the live model) and the demo. If time remains after DEMO-01, try Tauri on one OS and keep the web app as the fallback.
 
 ## Running locally
 ```bash

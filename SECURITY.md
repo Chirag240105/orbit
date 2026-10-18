@@ -1,6 +1,6 @@
 # Security policy
 
-ORBIT is a hackathon-stage project, not production software. See `docs/SECURITY_MODEL.md` for what is and isn't implemented and `docs/THREAT_MODEL.md` for the model.
+ORBIT is an early-stage project, not production software. See `docs/SECURITY_MODEL.md` for what is and isn't implemented and `docs/THREAT_MODEL.md` for the model.
 
 Report vulnerabilities privately to the maintainers (Chirag, Charanjeet) rather than in a public issue. Do not include real secrets or personal files in reports.
 

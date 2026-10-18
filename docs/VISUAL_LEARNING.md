@@ -7,7 +7,7 @@
 | Camera preview with consent, indicator, stop button | `getUserMedia`; verified in Edge with a fake camera. Not tested on a physical webcam |
 | Marker recognition (CV-01) | **Built.** Printed ArUco markers (ARUCO_MIP_36h12, ids 1 and 2) select a scene. Detection runs in the browser (js-aruco2) every 250 ms on a downscaled in-memory frame; a marker must be seen in 3 consecutive frames. Verified end to end in Edge by feeding the fake camera a video of marker #2. Print them at `/visual/markers` |
 | AI explanation of a selected part (AI-09) | **Built.** "Explain more with AI" calls `POST /api/learn/explain`; labeled "AI-generated" with the model name, or "Curated text (no model)" in demo/unconfigured mode |
-| Gesture control with MediaPipe (CV-02) | **Not built.** It needs a real camera and hand to verify, and a ~8 MB model that must be bundled to stay offline |
+| Gesture control with MediaPipe (CV-02) | **Built.** Hand tracking runs in the browser: pinch-drag rotates, two fingers zoom, open palm resets. The runtime and the ~8 MB model are served locally (`npm run setup:vision`). Not yet tried with a physical webcam |
 | Subjects not supported yet | Kubernetes, neural networks: shown as Planned with an explanation |
 
 Honest scope: this is **marker** recognition, not object recognition. OpenCV-style pipelines cannot turn arbitrary objects into accurate 3D models; ORBIT recognizes its own printed markers and loads a curated scene.

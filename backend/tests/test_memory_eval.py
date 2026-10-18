@@ -12,11 +12,11 @@ MEMORIES = [
     "I write tests with pytest and keep coverage above 80 percent",      # 6
     "My team uses GitHub pull requests with one required review",        # 7
     "I like explanations with diagrams and real examples",               # 8
-    "The hackathon demo must use NVIDIA Nemotron on Nebius",             # 9
+    "The product demo must use NVIDIA Nemotron on Nebius",               # 9
     "I study Kubernetes on weekends",                                     # 10
     "My preferred code editor is VS Code with Vim keybindings",          # 11
     "I want short answers unless I ask for detail",                      # 12
-    "Project deadline for ORBIT submission is the end of the month",     # 13
+    "Project deadline for the ORBIT release is the end of the month",    # 13
     "I use PostgreSQL at work and SQLite for personal projects",         # 14
 ]
 QUERIES = [
@@ -34,7 +34,7 @@ QUERIES = [
     ("Teach me about Kubernetes pods", {10}),
     ("Configure my editor keybindings", {11}),
     ("Give me a detailed answer about caching", {12}),
-    ("When is the submission deadline?", {13}),
+    ("When is the release deadline?", {13}),
     ("Compare PostgreSQL and SQLite", {14, 4}),
     ("Set up coverage reporting in CI", {6}),
     ("My laptop is slow when building Docker images", {2, 0}),

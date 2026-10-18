@@ -6,23 +6,23 @@ Owners come from the assignment in the project brief (Chirag: agent, backend, in
 
 **Status legend:** **Implemented, needs review**: code, tests and the card's criteria are verified (evidence on the card); it still needs the other teammate's review and a merge to become Done. **Partly done**: what is missing is named. **Blocked**: the reason is named. **Proposed**: needs a team decision.
 
-## Where things stand (2026-10-15, branch `feat/remaining-tasks`)
-- **Backend:** ~160 tests (164 pass on Linux; on Windows 3 symlink tests skip), 92% coverage, ruff clean. Live-model tests are written and skipped until a key is set.
-- **Frontend:** 85 tests, typecheck and build pass; 26/26 checks pass in a real browser (Edge) via `npm run e2e`.
-- **The one blocker:** **AI-01 needs a Nebius API key.** AI-02 and AI-07 (measurements), IN-01, IN-02 (hosted part), SEC-05 (live run), DEMO-01..03 all wait on it. Hackathon deadline: **30 Oct 2026, 10:00 AM PT** (`docs/HACKATHON.md`).
+## Where things stand (2026-10-18, branch `feat/not-built-features`)
+- **Backend:** ~200 tests (on Windows 3 symlink tests skip), ruff clean. Live-model tests are written and skipped until a key is set.
+- **Frontend:** 96 tests, typecheck and build pass; 26/26 checks pass in a real browser (Edge) via `npm run e2e`.
+- **The one blocker:** **AI-01 needs a Nebius API key.** AI-02 and AI-07 (measurements), IN-01, IN-02 (hosted part), SEC-05 (live run), DEMO-01..02 all wait on it. A key is now set locally and the app reports the model as connected; a validated live reply still needs to be confirmed.
 - **Needs people, not code:** SH-01 (protect `main`), SH-02 (second machine), IN-04 (decide packaging), QA-01 (decide formatter), DEMO rehearsals and video.
-- **Not built:** CV-02 (gestures), Tauri. See also the new follow-ups at the end.
+- **Not built:** Tauri. See also the follow-ups at the end.
 
 ## Milestones and integration order
-1. **M1 Foundations agreed** (SH-01..04) can all start immediately, in parallel.
+1. **M1 Foundations agreed** (SH-01, SH-02, SH-04) can all start immediately, in parallel.
 2. **M2 Real model working** (AI-01, then AI-02). Frontend polish (FE-01, FE-02) runs in parallel.
 3. **M3 Project intelligence** (BE-03, SEC-03, SEC-04, FE-06) and **Visual studio** (FE-07, FE-08) run in parallel.
 4. **M4 Integrated and reviewed** (IN-01..03, SEC-05, QA-02/03).
-5. **M5 Demo ready** (DEMO-01..03). Deadline: 30 Oct 2026, 10:00 AM PT (verify on Devpost).
+5. **M5 Demo ready** (DEMO-01..02).
 
 Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → DEMO.
 
-**Parallel-safe now (no dependencies):** SH-01..04, BE-01, SEC-01, FE-01, FE-02, AI-06, FE-05, SEC-03, SEC-04, FE-06, FE-07, FE-08, CV-02, IN-04, QA-01, DOC-01.
+**Parallel-safe now (no dependencies):** SH-01, SH-02, SH-04, BE-01, SEC-01, FE-01, FE-02, AI-06, FE-05, SEC-03, SEC-04, FE-06, FE-07, FE-08, IN-04, QA-01, DOC-01.
 **Needs a teammate's work:** anything with a dependency listed on its card; FE-04 needs AI-04, CV-01 needs FE-08, IN-01 needs AI-01 and FE-02.
 
 ## Definition of Done
@@ -61,15 +61,6 @@ Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → 
 - **Files/modules:** `README.md`, `scripts/dev.sh`
 - **Acceptance criteria:** Both machines: backend tests pass, frontend builds, app loads in demo mode.
 - **Tests required:** Existing suites
-
-### SH-03: Confirm hackathon model and infrastructure rules
-- **Owner:** Shared | **Priority:** P0 | **Status:** Implemented, needs review
-- **Evidence:** `docs/HACKATHON.md`: eligibility, deadline (30 Oct 2026, 10:00 PT), submission requirements, ORBIT gap table. Partly from secondary sources: verify against the full Devpost rules.
-- **Depends on:** none (can start now)
-- **Description:** Read the current rules for the Personal AI track: which NVIDIA model families and which Nebius services count, and what evidence is required.
-- **Files/modules:** `docs/` (add a short note)
-- **Acceptance criteria:** Written note naming the exact eligible model and the evidence the submission needs.
-- **Tests required:** None
 
 ### SH-04: Freeze the v0 API contract
 - **Owner:** Shared | **Priority:** P1 | **Status:** Implemented, needs review
@@ -133,8 +124,8 @@ Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → 
 
 ### AI-01: Verify a live Nebius + Nemotron call
 - **Owner:** Chirag | **Priority:** P0 | **Status:** Blocked: needs a Nebius API key
-- **Evidence:** Ready: `scripts/list_models.py`, `tests/test_live_provider.py` (skipped unless `ORBIT_LIVE_TESTS=1`), bad-key and bad-model checks. Record the working model ID in `.env.example` and `docs/SUBMISSION.md`.
-- **Depends on:** SH-03
+- **Evidence:** Ready: `scripts/list_models.py`, `tests/test_live_provider.py` (skipped unless `ORBIT_LIVE_TESTS=1`), bad-key and bad-model checks. Record the working model ID in `.env.example` and the README status table.
+- **Depends on:** none (can start now)
 - **Description:** Create a key, run `scripts/list_models.py`, set `NEBIUS_MODEL` to a real eligible ID, run chat for all four skills. Record which model ID worked and how reasoning output arrives (the provider treats empty `content` as an error).
 - **Files/modules:** `.env.example`, `backend/app/providers/nebius.py`, `docs/`
 - **Acceptance criteria:** General Q&A returns a validated structured answer from the real model; model ID in `.env.example` is verified; failure modes tested manually (bad key, bad model).
@@ -303,8 +294,8 @@ Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → 
 - **Tests required:** Unit test on sample images
 
 ### CV-02: Gesture control with MediaPipe
-- **Owner:** Charanjeet | **Priority:** P2 | **Status:** Not Started
-- **Evidence:** Deferred: needs a real camera and hand to verify, and the MediaPipe model (~8 MB) bundled for offline use.
+- **Owner:** Charanjeet | **Priority:** P2 | **Status:** Implemented, needs review
+- **Evidence:** MediaPipe hand tracking in the browser (`src/lib/gestures.ts`, `CameraPanel.tsx`): pinch-drag rotates, two fingers zoom, open palm resets. Runtime and model served locally by `npm run setup:vision` (no CDN). Unit tests in `tests/gestures.test.ts`. Not yet tried with a physical webcam.
 - **Depends on:** none (can start now)
 - **Description:** Optional hand gestures for rotate/zoom, opt-in and processed in the browser.
 - **Files/modules:** `frontend/src/features/visual-learning/`
@@ -391,7 +382,7 @@ Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → 
 
 ### DOC-01: Write the remaining documents
 - **Owner:** Shared | **Priority:** P1 | **Status:** Implemented, needs review
-- **Evidence:** Written: PROJECT_OVERVIEW, DATA_FLOW, DATABASE_SCHEMA, AI_AGENT_DESIGN, MEMORY_DESIGN, UI_UX_GUIDE, DEPLOYMENT, TROUBLESHOOTING, HACKATHON, DEMO_SCRIPT, SUBMISSION, plus a README in each backend package; existing docs updated; all linked from the README. docker-compose not added (see IN-04).
+- **Evidence:** Written: PROJECT_OVERVIEW, DATA_FLOW, DATABASE_SCHEMA, AI_AGENT_DESIGN, MEMORY_DESIGN, UI_UX_GUIDE, DEPLOYMENT, TROUBLESHOOTING, DEMO_SCRIPT, plus a README in each backend package; existing docs updated; all linked from the README. docker-compose not added (see IN-04).
 - **Depends on:** none (can start now)
 - **Description:** Not yet written: `PROJECT_OVERVIEW`, `DATA_FLOW`, `DATABASE_SCHEMA`, `AI_AGENT_DESIGN`, `MEMORY_DESIGN`, `UI_UX_GUIDE`, `DEPLOYMENT`, `TROUBLESHOOTING`, plus `docker-compose.yml` if wanted. Per-folder READMEs for each backend package.
 - **Files/modules:** `docs/`
@@ -408,7 +399,7 @@ Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → 
 - **Tests required:** Manual
 
 
-## Phase 8: Hackathon demo and submission
+## Phase 8: Demo
 
 ### DEMO-01: Demo script and sample project
 - **Owner:** Shared | **Priority:** P0 | **Status:** Partly done
@@ -427,15 +418,6 @@ Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → 
 - **Files/modules:** outside repo
 - **Acceptance criteria:** Video under 3 minutes showing real (not demo-mode) model output.
 - **Tests required:** Review
-
-### DEMO-03: Submission write-up with provider evidence
-- **Owner:** Chirag | **Priority:** P0 | **Status:** Partly done
-- **Evidence:** Draft in `docs/SUBMISSION.md` with local-vs-Nebius table and limitations; fill in model ID and evidence after AI-01.
-- **Depends on:** AI-01, SEC-05
-- **Description:** Describe truthfully what runs locally vs on Nebius, which model, and what is not implemented. Include evidence of Nebius usage that the rules require.
-- **Files/modules:** `README.md`, submission form
-- **Acceptance criteria:** Every claim maps to working code; limitations listed.
-- **Tests required:** Cross-check against the README status table
 
 ### DEMO-04: One-command start
 - **Owner:** Chirag | **Priority:** P2 | **Status:** Implemented, needs review
@@ -461,6 +443,14 @@ Integration order: AI-01 → IN-01 → BE-03 → IN-02 → SEC-05 → QA-03 → 
 ### AI-10: Learn-a-topic skill
 - **Owner:** Chirag | **Priority:** P1 | **Status:** Implemented, needs review
 - **Evidence:** `learn_topic`: explanation, plain-text diagram, real-world example, key points, interview questions; routes from "explain … like I'm a beginner … diagram … interview questions". Backend test and browser run.
+
+### AG-02: Agent mode (model-chosen steps)
+- **Owner:** Chirag (backend), Charanjeet (UI) | **Priority:** P1 | **Status:** Implemented, needs review
+- **Evidence:** Opt-in skill (enable in Skills): the model picks list, search, rank, read, propose or finish over server-sent events; no write tool, read-before-propose, caps on steps, reads and proposals, consent before any hosted run, every call audited. Live step trace in Projects. `tests/test_agent_loop.py`.
+
+### FE-10: Light/dark themes, logo, collapsible sidebar
+- **Owner:** Charanjeet | **Priority:** P2 | **Status:** Implemented, needs review
+- **Evidence:** Theme switch (System, Light, Dark) applied before first paint; WCAG AA measured in both themes (`docs/UI_UX_GUIDE.md`). Original ORBIT logo and favicon. Sidebar collapses to an icon rail; the AI Workspace starts collapsed. Enter sends in chat. Tests in `tests/components.test.tsx` and `tests/chat.test.tsx`; checked in Edge at several window sizes.
 
 ### FE-09: Screen-reader and phone pass
 - **Owner:** Charanjeet | **Priority:** P2 | **Status:** Not Started

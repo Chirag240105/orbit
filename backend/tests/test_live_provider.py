@@ -24,7 +24,7 @@ PROMPTS = {
                        "Summarize: Our outage was caused by an expired TLS certificate on the load balancer.",
                        "Summarize: SQLite is a serverless database stored in a single file."],
     "task_plan": ["Plan how to launch my side project in 4 weeks", "Plan my week: study for an exam, finish a report, go to the gym",
-                  "Break this down: migrate our app from SQLite to PostgreSQL", "Plan a hackathon demo for Friday",
+                  "Break this down: migrate our app from SQLite to PostgreSQL", "Plan a product demo for Friday",
                   "Steps to learn Kubernetes in a month"],
     "learn_topic": ["Explain Kubernetes like I'm a beginner, then give me a diagram, real-world example, and interview questions.",
                     "Teach me how DNS works", "Explain load balancers for beginners with a diagram", "Teach me what OAuth is",
