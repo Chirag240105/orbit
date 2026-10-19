@@ -5,6 +5,14 @@ provided on 2026-10-19. This describes the repository before the Phase 0 work
 in this change. Existing documented status has not been treated as independent
 verification.
 
+## Implementation progress
+
+Phases 0–3 are implemented on sequential feature branches. Phase 3 adds six
+intent labels, a maximum of three model tool rounds, typed tool arguments,
+metadata-only audit records, and approval-gated writes. The schedule tool is a
+registered placeholder and the chat UI does not yet render tool approval cards.
+Verification results and remaining limits are kept in the README feature table.
+
 ## Current repository
 
 - The backend is a FastAPI application using SQLAlchemy, SQLite by default,

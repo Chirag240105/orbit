@@ -1,5 +1,6 @@
 import logging
 import secrets
+from collections import deque
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.jwt_secret = settings.jwt_secret or secrets.token_urlsafe(48)
     app.state.auth_rate_limit = RateLimiter(limit=10, window_s=60)
+    app.state.last_turns = deque(maxlen=50)
     gateway = ModelGateway(settings)
     app.state.model_gateway = gateway
     app.state.provider = build_provider(settings, gateway)

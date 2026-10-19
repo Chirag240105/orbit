@@ -85,6 +85,9 @@ class ChatResponse(BaseModel):
     context: ContextUsed
     proposed_tasks: list[ProposedTask] = []
     warnings: list[str] = []
+    intent: Literal["chat", "plan_day", "task_op", "memory_op", "code_q", "vision_ctx"] = "chat"
+    tool_calls: list[dict[str, Any]] = []
+    pending_actions: list[dict[str, Any]] = []
 
 
 class ConversationOut(ORM):
@@ -115,6 +118,10 @@ class SkillOut(BaseModel):
 
 class SkillPatch(BaseModel):
     enabled: bool
+
+
+class ToolPermissionPatch(BaseModel):
+    trusted_for_session: bool
 
 
 class WorkspaceIn(BaseModel):

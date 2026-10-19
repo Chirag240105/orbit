@@ -8,6 +8,7 @@ export type ChatRequest = { message: string; conversation_id?: number | null; sk
 export type ChatResponse = {
   conversation_id: number; message_id: number; skill: string; output: Record<string, unknown>;
   provider: { name: string; model: string; is_demo: boolean }; context: ContextUsed; proposed_tasks: ProposedTask[]; warnings: string[];
+  intent: "chat" | "plan_day" | "task_op" | "memory_op" | "code_q" | "vision_ctx"; tool_calls: { name: string; status: string }[]; pending_actions: Record<string, unknown>[];
 };
 export type Message = { id: number; role: "user" | "assistant"; content: string | Record<string, unknown>; skill: string | null; meta: { provider?: ChatResponse["provider"]; context?: ContextUsed; warnings?: string[] } | null; created_at: string };
 export type Skill = { name: string; title: string; description: string; required_permissions: string[]; requires_files: boolean; enabled: boolean; input_schema: SchemaDoc; output_schema: SchemaDoc };

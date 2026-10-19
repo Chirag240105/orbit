@@ -13,7 +13,17 @@ from app.core.errors import AppError
 from app.core.ratelimit import RateLimiter
 from app.db.session import get_db
 from app.memory.service import store_user_memory
-from app.models import Conversation, Memory, Message, ProposedChange, SkillSetting, Task, Workspace
+from app.models import (
+    Conversation,
+    Memory,
+    Message,
+    PendingAction,
+    ProposedChange,
+    SkillSetting,
+    Task,
+    ToolPermission,
+    Workspace,
+)
 from app.schemas import (
     ChangeOut,
     ChatRequest,
@@ -29,11 +39,18 @@ from app.schemas import (
     TaskIn,
     TaskOut,
     TaskPatch,
+    ToolPermissionPatch,
     WorkspaceIn,
     WorkspaceOut,
     WorkspacePatch,
 )
 from app.skills.base import SkillInput
+from app.tools.agent_registry import (
+    AGENT_TOOLS,
+    decide_pending_action,
+    invoke_agent_tool,
+    tool_catalog,
+)
 from app.tools.registry import TOOLS, execute_tool
 from app.workspace import service as wsvc
 from app.workspace.policy import validate_workspace_root
@@ -68,7 +85,10 @@ def settings_info(request: Request):
         "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo, "hosted": p.name in ("nebius", "nvidia"),
                      "endpoint": (s.nebius_base_url if s.llm_provider == "nebius" else s.nvidia_base_url) if s.llm_provider != "demo" else None},
         "limits": {"max_file_bytes": s.max_file_bytes, "max_context_chars": s.max_context_chars},
-        "tools": [{"name": t.name, "description": t.description, "permissions": list(t.permissions), "requires_confirmation": t.requires_confirmation} for t in TOOLS.values()],
+        "tools": (
+            [{"name": t.name, "description": t.description, "permissions": list(t.permissions), "requires_confirmation": t.requires_confirmation} for t in TOOLS.values()]
+            + [{"name": t.name, "description": t.description, "permissions": [t.permission], "requires_confirmation": t.permission == "write"} for t in AGENT_TOOLS.values()]
+        ),
         "privacy": [
             "Chat messages and matched memories are sent to the hosted model provider when a provider is configured.",
             "Workspace file excerpts are sent only for files you select, after secret redaction, and only after you confirm.",
@@ -83,7 +103,63 @@ def settings_info(request: Request):
 @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(chat_limit)])
 async def chat(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
     st = request.app.state
-    return await run_chat(req, db, st.settings, st.provider, st.registry, st.model_gateway)
+    return await run_chat(req, db, st.settings, st.provider, st.registry, st.model_gateway, st.last_turns)
+
+
+@router.get("/tools")
+def list_agent_tools():
+    return tool_catalog()
+
+
+@router.get("/tool-permissions")
+def list_tool_permissions(db: Session = Depends(get_db)):
+    rows = {row.tool_name: row for row in db.scalars(select(ToolPermission))}
+    return [
+        {"tool_name": name, "permission": tool.permission,
+         "trusted_for_session": bool(rows.get(name) and rows[name].trusted_for_session)}
+        for name, tool in AGENT_TOOLS.items() if tool.permission == "write"
+    ]
+
+
+@router.patch("/tool-permissions/{name}")
+def set_tool_permission(name: str, body: ToolPermissionPatch, db: Session = Depends(get_db)):
+    tool = AGENT_TOOLS.get(name)
+    if tool is None or tool.permission != "write":
+        raise AppError("not_found", "Writable tool not found.", 404)
+    row = db.scalar(select(ToolPermission).where(ToolPermission.tool_name == name))
+    if row is None:
+        row = ToolPermission(tool_name=name, permission=tool.permission)
+    row.trusted_for_session = body.trusted_for_session
+    db.add(row)
+    db.commit()
+    return {"tool_name": name, "permission": row.permission, "trusted_for_session": row.trusted_for_session}
+
+
+@router.post("/tools/{name}/invoke")
+async def invoke_tool(name: str, body: dict, request: Request, db: Session = Depends(get_db)):
+    return await invoke_agent_tool(name, body, db, request.app.state.settings, request.app.state.model_gateway)
+
+
+@router.get("/actions")
+def list_pending_actions(status: str = "pending", db: Session = Depends(get_db)):
+    return db.scalars(select(PendingAction).where(PendingAction.status == status).order_by(PendingAction.created_at.desc()).limit(100)).all()
+
+
+@router.post("/actions/{action_id}/approve")
+async def approve_pending_action(action_id: int, request: Request, db: Session = Depends(get_db)):
+    action = await decide_pending_action(action_id, approve=True, db=db, settings=request.app.state.settings, gateway=request.app.state.model_gateway)
+    return {"id": action.id, "tool_name": action.tool_name, "arguments": action.arguments, "status": action.status, "created_at": action.created_at, "decided_at": action.decided_at}
+
+
+@router.post("/actions/{action_id}/reject")
+async def reject_pending_action(action_id: int, request: Request, db: Session = Depends(get_db)):
+    action = await decide_pending_action(action_id, approve=False, db=db, settings=request.app.state.settings, gateway=request.app.state.model_gateway)
+    return {"id": action.id, "tool_name": action.tool_name, "arguments": action.arguments, "status": action.status, "created_at": action.created_at, "decided_at": action.decided_at}
+
+
+@router.get("/debug/last-turns")
+def last_turns(request: Request):
+    return list(request.app.state.last_turns)
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
