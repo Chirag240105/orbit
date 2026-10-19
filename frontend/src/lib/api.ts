@@ -74,6 +74,8 @@ export const api = {
   debugTurns: () => request<Record<string, unknown>[]>("GET", "/debug/last-turns"),
   toolPermissions: () => request<{ tool_name: string; trusted_for_session: boolean }[]>("GET", "/tool-permissions"),
   setToolTrust: (name: string, trusted_for_session: boolean) => request<{ tool_name: string; trusted_for_session: boolean }>("PATCH", `/tool-permissions/${name}`, { trusted_for_session }),
+  generateSchedule: (body: { request: string; date: string; timezone?: string }) => request<T.ScheduleDraft>("POST", "/schedule/generate", body),
+  schedule: (day: string) => request<T.ScheduleBlock[]>("GET", `/schedule?day=${encodeURIComponent(day)}`),
   conversations: () => request<T.Conversation[]>("GET", "/conversations"),
   messages: (id: number) => request<T.Message[]>("GET", `/conversations/${id}/messages`),
   deleteConversation: (id: number) => request<void>("DELETE", `/conversations/${id}`),

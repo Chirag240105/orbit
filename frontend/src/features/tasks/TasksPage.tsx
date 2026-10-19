@@ -13,10 +13,21 @@ export function TasksPage() {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Task["priority"]>("medium");
   const [due, setDue] = useState("");
+  const [planText, setPlanText] = useState("");
+  const [planDate, setPlanDate] = useState(() => {
+    const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  });
+  const [draft, setDraft] = useState<Awaited<ReturnType<typeof api.generateSchedule>> | null>(null);
+  const plan = useQuery({ queryKey: ["schedule", planDate], queryFn: () => api.schedule(planDate) });
   const refresh = () => qc.invalidateQueries({ queryKey: ["tasks"] });
   const add = useMutation({ mutationFn: () => api.addTask({ title: title.trim(), priority, due: due || null }), onSuccess: () => { setTitle(""); setDue(""); refresh(); } });
   const patch = useMutation({ mutationFn: (v: { id: number; b: Partial<Task> }) => api.patchTask(v.id, v.b), onSuccess: refresh });
   const del = useMutation({ mutationFn: (id: number) => api.deleteTask(id), onSuccess: refresh });
+  const generate = useMutation({ mutationFn: () => api.generateSchedule({ request: planText.trim(), date: planDate }), onSuccess: setDraft });
+  const decideSchedule = useMutation({
+    mutationFn: (approve: boolean) => approve ? api.approveAction(draft!.pending_action_id) : api.rejectAction(draft!.pending_action_id),
+    onSuccess: () => { setDraft(null); setPlanText(""); qc.invalidateQueries({ queryKey: ["schedule", planDate] }); refresh(); },
+  });
   const proposed = data?.filter((t) => t.status === "proposed") ?? [];
 
   const Row = ({ t }: { t: Task }) => (
@@ -35,7 +46,22 @@ export function TasksPage() {
 
   return (
     <div>
-      <PageHeader title="Tasks and Plans" description="Plans from the AI Workspace arrive here as proposals. Nothing becomes a task until you approve it." />
+      <PageHeader title="Tasks and Plans" description="Turn a natural-language day plan into timed blocks, then approve before ORBIT saves tasks and schedule records." />
+      <Panel title="Plan a day" className="mb-5">
+        <form className="flex flex-wrap items-end gap-3" onSubmit={(e) => { e.preventDefault(); if (planText.trim()) generate.mutate(); }}>
+          <div className="min-w-56 flex-1"><Field label="What is on your day?"><textarea className={inputCls} rows={2} value={planText} onChange={(e) => setPlanText(e.target.value)} placeholder="Tomorrow I have a meeting at 11. Finish the backend, review the frontend PR, and prepare the presentation." /></Field></div>
+          <Field label="Date"><input type="date" className={inputCls} value={planDate} onChange={(e) => setPlanDate(e.target.value)} /></Field>
+          <Button type="submit" variant="primary" disabled={!planText.trim() || generate.isPending}>Generate schedule</Button>
+        </form>
+        {generate.error && <ErrorState error={generate.error} />}
+        {draft && <div className="mt-4 rounded-md border border-line p-3">
+          <h3 className="text-sm font-semibold">Proposed schedule · {draft.date} ({draft.timezone})</h3>
+          <ul className="mt-2 space-y-2">{draft.blocks.map((block, i) => <li key={block.title + i} className="rounded bg-bg p-2 text-sm"><b>{block.starts_at.slice(11, 16)}–{block.ends_at.slice(11, 16)}</b> · {block.title}<p className="text-xs text-muted">{block.rationale}</p></li>)}</ul>
+          {draft.conflicts.map((conflict, i) => <p key={i} className="mt-2 text-xs text-warn">{conflict.title}: {conflict.reason.replaceAll("_", " ")}</p>)}
+          <div className="mt-3 flex gap-2"><Button disabled={decideSchedule.isPending} onClick={() => decideSchedule.mutate(false)}>Reject</Button><Button variant="primary" disabled={decideSchedule.isPending} onClick={() => decideSchedule.mutate(true)}>Approve schedule</Button></div>
+        </div>}
+        <div className="mt-4 border-t border-line pt-3"><h3 className="text-sm font-semibold">Saved schedule · {planDate}</h3>{plan.isLoading ? <Skeleton className="mt-2 h-10" /> : plan.error ? <ErrorState error={plan.error} retry={() => plan.refetch()} /> : !plan.data?.length ? <p className="mt-2 text-sm text-muted">No saved blocks for this day.</p> : <ul className="mt-2 space-y-1">{plan.data.map((block) => <li key={block.id} className="text-sm"><b>{block.starts_at.slice(11, 16)}–{block.ends_at.slice(11, 16)}</b> · {block.title} <span className="text-xs text-muted">{block.rationale}</span></li>)}</ul>}</div>
+      </Panel>
       {isLoading ? <Skeleton className="h-24" /> : error ? <ErrorState error={error} retry={() => refetch()} /> : (
         <>
           {proposed.length > 0 && (

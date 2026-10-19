@@ -130,7 +130,20 @@ async def _search_memory(db: Session, args: dict, _settings: Settings, gateway: 
 
 
 async def _generate_schedule(_db: Session, _args: dict, _settings: Settings, _gateway: ModelGateway | None):
-    raise AppError("not_implemented", "Schedule generation is not available yet.", 501)
+    if _gateway is None:
+        raise AppError("model_not_configured", "Schedule generation needs the model gateway.", 503)
+    from app.schedule.service import ScheduleGenerateIn, create_schedule_draft
+
+    day = _args.get("date") or Date.today()
+    draft, action_id = await create_schedule_draft(
+        ScheduleGenerateIn(request=_args["request"], date=day), _db, _settings, _gateway,
+    )
+    return {
+        "pending_action_id": action_id,
+        "status": "pending",
+        "tool_name": "schedule_approval",
+        "draft": draft.model_dump(mode="json"),
+    }
 
 
 async def _analyze_code(db: Session, args: dict, settings: Settings, gateway: ModelGateway | None):
@@ -157,7 +170,7 @@ AGENT_TOOLS: dict[str, AgentTool] = {
         AgentTool("create_note", "Create a project note", "write", CreateNoteArgs, _create_note),
         AgentTool("save_memory", "Save a user-confirmed memory", "write", SaveMemoryArgs, _save_memory),
         AgentTool("search_memory", "Search confirmed memories", "read", SearchMemoryArgs, _search_memory),
-        AgentTool("generate_schedule", "Generate a proposed schedule", "write", GenerateScheduleArgs, _generate_schedule),
+        AgentTool("generate_schedule", "Prepare a schedule proposal for user approval", "read", GenerateScheduleArgs, _generate_schedule),
         AgentTool("analyze_code", "Read and analyze an authorized code file", "read", AnalyzeCodeArgs, _analyze_code),
         AgentTool("save_vision_context", "Save a vision observation as memory", "write", SaveVisionContextArgs, _save_vision_context),
     )
@@ -200,7 +213,10 @@ async def invoke_agent_tool(
     result = await tool.handler(db, args, settings, gateway)
     db.commit()
     audit(db, f"agent_tool.{name}.executed", permission=tool.permission)
-    return {"status": "executed", "tool_name": name, "result": _encode_result(result)}
+    encoded = _encode_result(result)
+    if isinstance(encoded, dict) and encoded.get("status") == "pending":
+        return encoded | {"tool_name": name}
+    return {"status": "executed", "tool_name": name, "result": encoded}
 
 
 async def decide_pending_action(
@@ -214,6 +230,15 @@ async def decide_pending_action(
         action.decided_at = datetime.now(timezone.utc)
         db.commit()
         audit(db, "agent_action.reject", action_id=action.id, tool_name=action.tool_name)
+        return action
+    if action.tool_name == "schedule_approval":
+        from app.schedule.service import approve_schedule
+
+        approve_schedule(db, action.arguments)
+        action.status = "approved"
+        action.decided_at = datetime.now(timezone.utc)
+        db.commit()
+        audit(db, "agent_action.approve", action_id=action.id, tool_name=action.tool_name)
         return action
     tool = AGENT_TOOLS.get(action.tool_name)
     if tool is None or tool.permission != "write":

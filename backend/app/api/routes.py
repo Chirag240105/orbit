@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
@@ -24,6 +24,7 @@ from app.models import (
     ToolPermission,
     Workspace,
 )
+from app.schedule.service import ScheduleGenerateIn, create_schedule_draft, get_schedule
 from app.schemas import (
     ChangeOut,
     ChatRequest,
@@ -352,6 +353,26 @@ def reject(cid: int, db: Session = Depends(get_db)):
 
 
 # ---------- tasks ----------
+@router.post("/schedule/generate")
+async def generate_schedule(body: ScheduleGenerateIn, request: Request, db: Session = Depends(get_db)):
+    draft, action_id = await create_schedule_draft(body, db, request.app.state.settings, request.app.state.model_gateway)
+    return {
+        "date": draft.date.isoformat(), "timezone": draft.timezone,
+        "blocks": [block.model_dump(mode="json") for block in draft.blocks],
+        "conflicts": draft.conflicts, "pending_action_id": action_id,
+    }
+
+
+@router.get("/schedule")
+def schedule_for_date(day: date, timezone_name: str = "Asia/Calcutta", db: Session = Depends(get_db)):
+    return [
+        {"id": block.id, "title": block.title, "starts_at": block.starts_at.isoformat(),
+         "ends_at": block.ends_at.isoformat(), "rationale": block.rationale, "task_id": block.task_id,
+         "timezone": timezone_name}
+        for block in get_schedule(db, day)
+    ]
+
+
 @router.get("/tasks", response_model=list[TaskOut])
 def list_tasks(db: Session = Depends(get_db)):
     return db.scalars(select(Task).order_by(Task.id.desc())).all()

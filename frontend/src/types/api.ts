@@ -10,7 +10,7 @@ export type ChatResponse = {
   provider: { name: string; model: string; is_demo: boolean }; context: ContextUsed; proposed_tasks: ProposedTask[]; warnings: string[];
   intent: "chat" | "plan_day" | "task_op" | "memory_op" | "code_q" | "vision_ctx"; tool_calls: { name: string; status: string }[]; pending_actions: Record<string, unknown>[];
 };
-export type PendingAction = { pending_action_id: number; tool_name: string; status: "pending" };
+export type PendingAction = { pending_action_id: number; tool_name: string; status: "pending"; draft?: { blocks: ScheduleBlock[]; conflicts: { title: string; reason: string }[]; date: string; timezone: string } };
 export type Message = { id: number; role: "user" | "assistant"; content: string | Record<string, unknown>; skill: string | null; meta: { provider?: ChatResponse["provider"]; context?: ContextUsed; warnings?: string[]; intent?: ChatResponse["intent"]; tool_calls?: ChatResponse["tool_calls"]; pending_actions?: PendingAction[] } | null; created_at: string };
 export type Skill = { name: string; title: string; description: string; required_permissions: string[]; requires_files: boolean; enabled: boolean; input_schema: SchemaDoc; output_schema: SchemaDoc };
 export type SchemaDoc = { properties?: Record<string, { type?: string; description?: string; title?: string }>; required?: string[] };
@@ -20,6 +20,8 @@ export type SearchHit = { path: string; line: number | null; snippet: string | n
 export type WorkspaceSummary = { file_count: number; by_extension: Record<string, number>; top_level_folders: Record<string, number>; config_files: string[]; note: string };
 export type Change = { id: number; workspace_id: number; rel_path: string; description: string; original_content: string | null; new_content: string; status: "pending" | "applied" | "rejected" | "stale"; created_at: string; decided_at: string | null };
 export type Task = { id: number; title: string; notes: string; status: "proposed" | "todo" | "doing" | "done"; priority: "high" | "medium" | "low"; due: string | null; source: string; created_at: string };
+export type ScheduleBlock = { id?: number; title: string; starts_at: string; ends_at: string; rationale: string; task_title?: string | null; task_id?: number | null };
+export type ScheduleDraft = { date: string; timezone: string; blocks: ScheduleBlock[]; conflicts: { title: string; reason: string }[]; pending_action_id: number };
 export type SettingsInfo = {
   provider: Provider & { hosted: boolean }; limits: { max_file_bytes: number; max_context_chars: number };
   tools: { name: string; description: string; permissions: string[]; requires_confirmation: boolean }[]; privacy: string[];
