@@ -76,6 +76,7 @@ export const api = {
   setToolTrust: (name: string, trusted_for_session: boolean) => request<{ tool_name: string; trusted_for_session: boolean }>("PATCH", `/tool-permissions/${name}`, { trusted_for_session }),
   generateSchedule: (body: { request: string; date: string; timezone?: string }) => request<T.ScheduleDraft>("POST", "/schedule/generate", body),
   schedule: (day: string) => request<T.ScheduleBlock[]>("GET", `/schedule?day=${encodeURIComponent(day)}`),
+  explainCode: (body: { mode: "selection" | "file" | "project" | "flow"; workspace_id?: number; path?: string; selection?: string; consent_external?: boolean }) => request<T.CodeExplainResult>("POST", "/code/explain", body),
   conversations: () => request<T.Conversation[]>("GET", "/conversations"),
   messages: (id: number) => request<T.Message[]>("GET", `/conversations/${id}/messages`),
   deleteConversation: (id: number) => request<void>("DELETE", `/conversations/${id}`),

@@ -54,6 +54,7 @@ from app.tools.agent_registry import (
 )
 from app.tools.registry import TOOLS, execute_tool
 from app.workspace import service as wsvc
+from app.workspace.code_explain import CodeExplainIn, explain_code
 from app.workspace.policy import validate_workspace_root
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -299,6 +300,11 @@ def tree(request: Request, ws: Workspace = Depends(get_workspace), db: Session =
 @router.get("/workspaces/{workspace_id}/summary")
 def summary(ws: Workspace = Depends(get_workspace)):
     return wsvc.summarize(ws.path)
+
+
+@router.post("/code/explain")
+async def code_explanation(body: CodeExplainIn, request: Request, db: Session = Depends(get_db)):
+    return await explain_code(body, db, request.app.state.settings, request.app.state.model_gateway)
 
 
 @router.get("/workspaces/{workspace_id}/search")

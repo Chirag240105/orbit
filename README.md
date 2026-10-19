@@ -13,7 +13,7 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 
 | Feature | Status |
 |---|---|
-| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 79 passed and 2 skipped in the current suite |
+| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 83 passed and 2 skipped in the current suite |
 | PostgreSQL + pgvector schema, Alembic migration, JWT auth and user scoping | **Implemented; migration verified on SQLite. PostgreSQL runtime not verified here.** |
 | Chat orchestration, skill registry (4 skills), schema-validated output | **Working** (tested with demo provider and mocked HTTP) |
 | Nebius and NVIDIA OpenAI-compatible gateway | **Gateway implemented; live calls unverified.** Choose task model IDs with `scripts/list_models.py`; needs a provider key |
@@ -21,6 +21,8 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 | Memory (typed records, embeddings, importance/recency ranking, dedupe, confirmation and deletion) | **Implemented; provider embeddings and local fallback need live verification. Demo retrieval uses keyword matching.** |
 | Agent intent routing and tools | **Implemented**: six intent labels; validated task, note, memory, code, vision, and schedule tools; reads are audited, writes require approval by default; max three model tool rounds. |
 | Day scheduling | **Implemented**: natural-language extraction, timezone-aware deterministic packing, fixed-event conflict and deadline overflow reporting, rationale, and approval-gated task/block saves. Planner provider path is not live-verified; demo extraction is heuristic. |
+| Developer intelligence | **Implemented**: selection/file/project/flow explanations, existing workspace exclusions, redaction, hosted-send confirmation, map-reduce, and unconfirmed project-summary memory. Added a predictable FastAPI trace demo repo. Live model quality is unverified. |
+| VS Code extension | **Packaged** at vscode-extension/orbit-personal-ai-0.1.0.vsix; TypeScript compile and VSIX packaging pass. Not yet installed or manually exercised in VS Code. |
 | Streaming chat and decision UI | **Implemented**: authenticated WebSocket event stream (POST `/api/chat` remains available), memory chips, action approval cards, answer rationale, and per-user debug turns. Live provider streaming not verified. |
 | Workspace policy, read-only inspection, proposal and approval flow | **Working**, unit and API tested |
 | Secret redaction, consent before external send | **Working**, best-effort redaction |
@@ -28,7 +30,7 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 | 3D scene and camera panel | **Built, not verified in a browser or on a device** |
 | OpenCV / MediaPipe recognition | **Not implemented** (tasks CV-01, CV-02) |
 | Alembic migrations | **Initial user-scoped schema implemented**; empty SQLite migration tested. PostgreSQL runtime not verified here. |
-| Schedule generation, VS Code extension, gesture recognition | **Planned** (see `TASKS.md` and `docs/GAP_ANALYSIS.md`) |
+| Gesture recognition, public deployment, submission feedback assets | **Planned** (see `TASKS.md` and `docs/GAP_ANALYSIS.md`) |
 
 ## Architecture
 React frontend → JWT-authenticated FastAPI backend → PostgreSQL/pgvector and the model gateway. The backend owns provider keys, file policy, memory, and model calls. See `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/SECURITY_MODEL.md`.
@@ -61,6 +63,8 @@ Create an account on the ORBIT sign-in screen. Set a stable random `ORBIT_JWT_SE
 
 **Trying the workspace features safely:** authorize `examples/example-project` in Projects.
 
+**VS Code extension:** install vscode-extension/orbit-personal-ai-0.1.0.vsix, authorize a matching workspace in ORBIT Projects, link its workspace ID in VS Code, and set the ORBIT access token. Hosted sharing is off by default and asks before each send.
+
 ## Troubleshooting
 - *"Backend not reachable":* start uvicorn on port 8000 (the Vite dev server proxies `/api`).
 - *Setup banner in chat:* no key and no demo mode set; edit `.env` and restart the backend.
@@ -71,7 +75,7 @@ Create an account on the ORBIT sign-in screen. Set a stable random `ORBIT_JWT_SE
 - *`workspace_too_broad`:* choose a project folder, not `/`, your home folder, or a top-level system folder.
 
 ## Limitations
-Account registration/login and user-scoped records are implemented. Set a stable random ORBIT_JWT_SECRET for deployments; without it, the backend generates a process-local secret and existing login tokens expire when it restarts. Redaction is pattern-based and incomplete. Schedule duration extraction and rationale quality depend on the configured model and have not been verified with a live provider. Trusted tool permissions are stored in the database until turned off. Camera gesture recognition does not exist. Demo memory retrieval uses keyword matching.
+Account registration/login and user-scoped records are implemented. Set a stable random ORBIT_JWT_SECRET for deployments; without it, the backend generates a process-local secret and existing login tokens expire when it restarts. Redaction is pattern-based and incomplete. Schedule duration extraction, code explanations, and rationale quality depend on the configured model and have not been verified with a live provider. Trusted tool permissions are stored in the database until turned off. The extension package has not been installed in a real VS Code instance. Camera gesture recognition does not exist. Demo memory retrieval uses keyword matching.
 
 ## Team and contributing
 Chirag: AI agent, backend architecture, integrations, security. Charanjeet: frontend, UI/UX, visual learning, integration. Work from `TASKS.md`; process in `docs/TEAM_WORKFLOW.md` and `CONTRIBUTING.md`. To add a feature, a skill, or a screen: `docs/EXTENDING.md`, `docs/SKILL_DEVELOPMENT.md`.

@@ -22,6 +22,7 @@ export type Change = { id: number; workspace_id: number; rel_path: string; descr
 export type Task = { id: number; title: string; notes: string; status: "proposed" | "todo" | "doing" | "done"; priority: "high" | "medium" | "low"; due: string | null; source: string; created_at: string };
 export type ScheduleBlock = { id?: number; title: string; starts_at: string; ends_at: string; rationale: string; task_title?: string | null; task_id?: number | null };
 export type ScheduleDraft = { date: string; timezone: string; blocks: ScheduleBlock[]; conflicts: { title: string; reason: string }[]; pending_action_id: number };
+export type CodeExplainResult = { mode: string; summary: string; files: { path: string; summary: string }[]; flow_steps: string[]; risks: string[]; dependencies: string[]; unknowns: string[]; redactions: number; external: boolean; stored_memory_id: number | null };
 export type SettingsInfo = {
   provider: Provider & { hosted: boolean }; limits: { max_file_bytes: number; max_context_chars: number };
   tools: { name: string; description: string; permissions: string[]; requires_confirmation: boolean }[]; privacy: string[];
