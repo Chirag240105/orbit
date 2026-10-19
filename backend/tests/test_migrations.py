@@ -22,7 +22,7 @@ def test_initial_migration_creates_prd_tables(tmp_path, monkeypatch):
     tables = set(inspect(engine).get_table_names())
     assert {"users", "projects", "tasks", "schedule_blocks", "memories", "conversations", "notes", "pending_actions", "tool_permissions", "audit_log"} <= tables
     memory_columns = {column["name"] for column in inspect(engine).get_columns("memories")}
-    assert {"user_id", "embedding", "importance", "last_accessed"} <= memory_columns
+    assert {"user_id", "embedding", "importance", "last_accessed", "project_id"} <= memory_columns
     engine.dispose()
 
 

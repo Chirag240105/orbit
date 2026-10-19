@@ -24,6 +24,11 @@ class MemoryIn(BaseModel):
     source: Literal["user", "chat_suggestion"] = "user"
 
 
+class VisionContextIn(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+    project_name: str = Field(min_length=1, max_length=120)
+
+
 class MemoryPatch(BaseModel):
     content: str | None = Field(None, min_length=1, max_length=2000)
     type: MemType | None = None
@@ -35,6 +40,7 @@ class MemoryOut(ORM):
     content: str
     type: str
     source: str
+    project_id: int | None = None
     confirmed: bool
     importance: float
     last_accessed: UtcDt

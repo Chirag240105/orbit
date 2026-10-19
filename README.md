@@ -6,14 +6,14 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 
 ## Three capabilities
 - **A. Chat and skills:** natural-language requests routed to reusable skills with validated structured output and user-approved memory.
-- **B. Vision:** a browser-only camera preview and curated 3D scene. Gesture recognition is not implemented yet.
+- **B. Vision:** browser-only hand tracking controls a curated 3D scene; pinching remembers the selected component as project-linked memory.
 - **C. Workspace intelligence:** authorize a folder, then list, search, preview and explain files; propose changes that need approval.
 
 ## Feature status (read this first)
 
 | Feature | Status |
 |---|---|
-| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 83 passed and 2 skipped in the current suite |
+| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 84 passed and 2 skipped in the current suite |
 | PostgreSQL + pgvector schema, Alembic migration, JWT auth and user scoping | **Implemented; migration verified on SQLite. PostgreSQL runtime not verified here.** |
 | Chat orchestration, skill registry (4 skills), schema-validated output | **Working** (tested with demo provider and mocked HTTP) |
 | Nebius and NVIDIA OpenAI-compatible gateway | **Gateway implemented; live calls unverified.** Choose task model IDs with `scripts/list_models.py`; needs a provider key |
@@ -26,11 +26,11 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 | Streaming chat and decision UI | **Implemented**: authenticated WebSocket event stream (POST `/api/chat` remains available), memory chips, action approval cards, answer rationale, and per-user debug turns. Live provider streaming not verified. |
 | Workspace policy, read-only inspection, proposal and approval flow | **Working**, unit and API tested |
 | Secret redaction, consent before external send | **Working**, best-effort redaction |
-| All 8 main screens | **Built**; typecheck, 11 frontend tests and production build pass. **Not yet reviewed in a real browser** |
-| 3D scene and camera panel | **Built, not verified in a browser or on a device** |
-| OpenCV / MediaPipe recognition | **Not implemented** (tasks CV-01, CV-02) |
+| All 8 main screens | **Built**; typecheck, 14 frontend tests and production build pass. **Not yet reviewed in a real browser** |
+| 3D scene and camera panel | **Built; browser and device behavior not manually verified** |
+| MediaPipe hand gestures (point, pinch, open hand, swipe) | **Implemented on-device with mouse/keyboard fallback; 20+ FPS not verified on target devices** |
 | Alembic migrations | **Initial user-scoped schema implemented**; empty SQLite migration tested. PostgreSQL runtime not verified here. |
-| Gesture recognition, public deployment, submission feedback assets | **Planned** (see `TASKS.md` and `docs/GAP_ANALYSIS.md`) |
+| Public deployment and submission feedback assets | **Planned** (see `TASKS.md` and `docs/GAP_ANALYSIS.md`) |
 
 ## Architecture
 React frontend → JWT-authenticated FastAPI backend → PostgreSQL/pgvector and the model gateway. The backend owns provider keys, file policy, memory, and model calls. See `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/SECURITY_MODEL.md`.
@@ -38,7 +38,7 @@ React frontend → JWT-authenticated FastAPI backend → PostgreSQL/pgvector and
 **Why this stack:** FastAPI and Pydantic provide typed validation, React + TypeScript + Vite power the web UI, PostgreSQL/pgvector store user-scoped work context, and a shared OpenAI-compatible gateway routes model requests.
 
 ## Privacy: what leaves your computer
-With a hosted provider configured, chat messages and matching memories are sent to that provider. File excerpts go only if you select them, after redaction, and after you confirm in a dialog. Camera video stays in the browser. Demo mode sends no model requests.
+With a hosted provider configured, chat messages and matching memories are sent to that provider. File excerpts go only if you select them, after redaction, and after you confirm in a dialog. Camera video is processed in the browser and is never uploaded; MediaPipe's runtime/model files are fetched from Google/CDN hosts and its documented usage metrics may be sent. Demo mode sends no model requests.
 
 ## Setup
 Prerequisites: Python 3.11+, Node 20+ (tested on Python 3.12, Node 22).
@@ -75,7 +75,7 @@ Create an account on the ORBIT sign-in screen. Set a stable random `ORBIT_JWT_SE
 - *`workspace_too_broad`:* choose a project folder, not `/`, your home folder, or a top-level system folder.
 
 ## Limitations
-Account registration/login and user-scoped records are implemented. Set a stable random ORBIT_JWT_SECRET for deployments; without it, the backend generates a process-local secret and existing login tokens expire when it restarts. Redaction is pattern-based and incomplete. Schedule duration extraction, code explanations, and rationale quality depend on the configured model and have not been verified with a live provider. Trusted tool permissions are stored in the database until turned off. The extension package has not been installed in a real VS Code instance. Camera gesture recognition does not exist. Demo memory retrieval uses keyword matching.
+Account registration/login and user-scoped records are implemented. Set a stable random ORBIT_JWT_SECRET for deployments; without it, the backend generates a process-local secret and existing login tokens expire when it restarts. Redaction is pattern-based and incomplete. Schedule duration extraction, code explanations, and rationale quality depend on the configured model and have not been verified with a live provider. Trusted tool permissions are stored in the database until turned off. The extension package has not been installed in a real VS Code instance. Gesture frame rate has not been measured on target devices. Demo memory retrieval uses keyword matching.
 
 ## Team and contributing
 Chirag: AI agent, backend architecture, integrations, security. Charanjeet: frontend, UI/UX, visual learning, integration. Work from `TASKS.md`; process in `docs/TEAM_WORKFLOW.md` and `CONTRIBUTING.md`. To add a feature, a skill, or a screen: `docs/EXTENDING.md`, `docs/SKILL_DEVELOPMENT.md`.

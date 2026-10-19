@@ -7,7 +7,7 @@ verification.
 
 ## Implementation progress
 
-Phases 0–6 are implemented on sequential feature branches. Phase 3 adds six
+Phases 0–7 are implemented on sequential feature branches. Phase 3 adds six
 intent labels, a maximum of three model tool rounds, typed tool arguments,
 metadata-only audit records, and approval-gated writes. Phase 4 adds an
 authenticated WebSocket event stream, approval and memory UI, answer rationale,
@@ -15,6 +15,8 @@ and per-user debug turns. Phase 5 adds schedule extraction, deterministic
 packing, conflict reporting, and pending approval to save tasks and blocks.
 Phase 6 adds consent-gated structured code explanation, a VS Code extension
 package, and a predictable layered FastAPI demo repository.
+Phase 7 adds on-device hand gestures, 3D scene controls, and project-linked
+vision memories. Frame-rate behavior still needs a target-device check.
 Verification results and remaining limits are kept in the README feature table.
 
 ## Current repository

@@ -158,7 +158,13 @@ async def _analyze_code(db: Session, args: dict, settings: Settings, gateway: Mo
 
 
 async def _save_vision_context(db: Session, args: dict, _settings: Settings, gateway: ModelGateway | None):
-    return await store_user_memory(db, args["content"], "VISION", gateway)
+    project_id = args.get("project_id")
+    if project_id is not None and db.scalar(select(Project.id).where(Project.id == project_id)) is None:
+        raise AppError("not_found", "Project not found.", 404)
+    memory = await store_user_memory(db, args["content"], "VISION", gateway)
+    if project_id is not None:
+        memory.project_id = project_id
+    return memory
 
 
 AGENT_TOOLS: dict[str, AgentTool] = {

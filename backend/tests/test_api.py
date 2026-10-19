@@ -77,3 +77,12 @@ def test_cors_allows_authorization_header_from_configured_origin(client):
     })
     assert r.status_code == 200
     assert "authorization" in r.headers["access-control-allow-headers"].lower()
+def test_explicit_vision_context_is_saved_as_project_linked_memory(demo):
+    result = demo.post("/api/vision/context", json={
+        "content": "The API gateway receives frontend requests.",
+        "project_name": "Cloud app architecture",
+    })
+    assert result.status_code == 201
+    memory = result.json()
+    assert memory["type"] == "VISION" and memory["confirmed"] is True
+    assert memory["project_id"] is not None

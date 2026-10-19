@@ -11,6 +11,7 @@ Live, authoritative docs: `http://127.0.0.1:8000/api/docs` while the backend run
 | `GET /api/actions`, `POST /api/actions/{id}/approve | reject` | Review pending tool and schedule actions |
 | `GET /api/debug/last-turns` | Recent debug metadata for the authenticated user's turns |
 | `POST /api/code/explain` | Structured selection, file, project, or flow explanation; hosted code requires explicit consent |
+| `POST /api/vision/context` | Save a confirmed VISION memory linked to a project created or found by name |
 | `GET/DELETE /api/conversations`, `GET .../{id}/messages`, `DELETE .../{id}` | History |
 | `GET/POST /api/memories`, `PATCH/DELETE /api/memories/{id}`, `DELETE /api/memories` | Memory |
 | `GET /api/skills`, `PATCH /api/skills/{name}` | Skill list and enable/disable |

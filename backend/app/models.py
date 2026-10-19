@@ -49,6 +49,7 @@ class Memory(Owned, Base):
     content: Mapped[str] = mapped_column(Text)
     type: Mapped[str] = mapped_column(String(20), default="USER")
     source: Mapped[str] = mapped_column(String(30), default="user")
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     confirmed: Mapped[bool] = mapped_column(Boolean, default=True)
     embedding: Mapped[list[float] | None] = mapped_column(JSON().with_variant(Vector(), "postgresql"), nullable=True)
     importance: Mapped[float] = mapped_column(Float, default=0.5)

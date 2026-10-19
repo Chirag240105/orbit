@@ -18,6 +18,7 @@ from app.models import (
     Memory,
     Message,
     PendingAction,
+    Project,
     ProposedChange,
     SkillSetting,
     Task,
@@ -41,6 +42,7 @@ from app.schemas import (
     TaskOut,
     TaskPatch,
     ToolPermissionPatch,
+    VisionContextIn,
     WorkspaceIn,
     WorkspaceOut,
     WorkspacePatch,
@@ -234,6 +236,21 @@ def delete_all_memories(db: Session = Depends(get_db)):
     db.query(Memory).delete()
     db.commit()
     audit(db, "memory.delete_all")
+
+
+@router.post("/vision/context", response_model=MemoryOut, status_code=201)
+async def save_vision_context(body: VisionContextIn, request: Request, db: Session = Depends(get_db)):
+    name = body.project_name.strip()
+    project = db.scalar(select(Project).where(Project.name == name))
+    if project is None:
+        project = Project(name=name, description="Created from an explicitly remembered visual learning context.")
+        db.add(project)
+        db.commit()
+    memory = await store_user_memory(db, body.content, "VISION", request.app.state.model_gateway)
+    memory.project_id = project.id
+    db.commit()
+    audit(db, "vision.context_saved", project_id=project.id, memory_id=memory.id)
+    return memory
 
 
 # ---------- skills ----------

@@ -1,6 +1,6 @@
 export type Provider = { name: string; model: string; configured: boolean; is_demo: boolean };
 export type Health = { status: string; version: string; database: string; provider: Provider & { demo_mode: boolean } };
-export type Memory = { id: number; content: string; type: string; source: string; confirmed: boolean; created_at: string; updated_at: string };
+export type Memory = { id: number; content: string; type: string; source: string; confirmed: boolean; project_id?: number | null; created_at: string; updated_at: string };
 export type Conversation = { id: number; title: string; updated_at: string };
 export type ContextUsed = { memory_ids: number[]; files: string[]; chars_sent: number; redactions: number; external: boolean };
 export type ProposedTask = { title: string; priority: "high" | "medium" | "low"; notes: string };

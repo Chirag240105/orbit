@@ -1,21 +1,52 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, EmptyState, PageHeader, Panel } from "../../components/ui";
+import { api } from "../../lib/api";
 import { CameraPanel } from "./CameraPanel";
+import type { HandGesture } from "./CameraPanel";
 import { SceneCanvas } from "./SceneCanvas";
 import { stepsOf, subjects } from "./scenes";
 
 export function VisualLearningPage() {
+  const qc = useQueryClient();
   const [subjectId, setSubjectId] = useState(subjects[0].id);
   const [selected, setSelected] = useState<string | null>(null);
   const [isolated, setIsolated] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [ready, setReady] = useState(false);
   const [learning, setLearning] = useState<number | null>(null);
+  const [gestureStatus, setGestureStatus] = useState("");
   const subject = subjects.find((s) => s.id === subjectId)!;
   const scene = subject.scene;
   const steps = scene ? stepsOf(scene) : [];
   const sel = scene?.components.find((c) => c.id === selected);
+  const remember = useMutation({
+    mutationFn: (content: string) => api.saveVisionContext({ content, project_name: subject.title }),
+    onSuccess: () => { setGestureStatus("Saved as a confirmed VISION memory linked to " + subject.title + "."); qc.invalidateQueries({ queryKey: ["memories"] }); },
+    onError: () => setGestureStatus("Could not save the visual memory."),
+  });
+  const handleGesture = (gesture: HandGesture, x: number) => {
+    if (!scene) return;
+    const components = scene.components;
+    const targetIndex = Math.min(components.length - 1, Math.max(0, Math.floor(x * components.length)));
+    if (gesture === "point") {
+      setSelected(components[targetIndex].id); setLearning(null);
+      setGestureStatus("Point selected " + components[targetIndex].label + ".");
+    } else if (gesture === "swipe_left" || gesture === "swipe_right") {
+      const currentIndex = Math.max(0, components.findIndex((component) => component.id === selected));
+      const nextIndex = (currentIndex + (gesture === "swipe_right" ? 1 : -1) + components.length) % components.length;
+      setSelected(components[nextIndex].id); setLearning(null);
+      setGestureStatus("Swipe selected " + components[nextIndex].label + ".");
+    } else if (gesture === "open") {
+      setSelected(null); setIsolated(null); setLearning(null);
+      setGestureStatus("Open hand cleared the selection.");
+    } else {
+      const target = sel ?? components[targetIndex];
+      setSelected(target.id); setLearning(null);
+      remember.mutate("Remembered from the camera: " + subject.title + " — " + target.label + ". " + target.summary);
+    }
+  };
 
   const pickSubject = (id: string) => { setSubjectId(id); setSelected(null); setIsolated(null); setLearning(null); setReady(false); };
   const goStep = (i: number) => { setLearning(i); setSelected(steps[i].id); setIsolated(null); };
@@ -55,6 +86,7 @@ export function VisualLearningPage() {
                 <p className="mt-2 text-sm leading-relaxed text-muted">{sel.details}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button onClick={() => setIsolated(isolated === sel.id ? null : sel.id)}>{isolated === sel.id ? "Show all parts" : "Isolate this part"}</Button>
+                  <Button disabled={remember.isPending} onClick={() => remember.mutate("Remembered from Visual Learning: " + subject.title + " — " + sel.label + ". " + sel.summary)}>Remember to project</Button>
                   <Link to="/chat" state={{ prompt: `In a three-tier cloud web app, explain the "${sel.label}" in simple terms, and what breaks if it fails.` }}><Button variant="ghost">Ask ORBIT in chat</Button></Link>
                 </div>
               </div>
@@ -81,7 +113,7 @@ export function VisualLearningPage() {
               ))}</ul>
             </Panel>
           )}
-          <Panel title="Camera (optional)"><CameraPanel /></Panel>
+          <Panel title="Camera and gestures (optional)"><CameraPanel onGesture={handleGesture} /><p role="status" className="mt-2 text-xs text-muted">{gestureStatus || "Use point, pinch (hold 300 ms), open hand, or swipe left/right. The mouse and parts list remain available."}</p>{remember.error && <p className="mt-1 text-xs text-danger">Memory save failed. Try the button above.</p>}</Panel>
         </div>
       </div>
     </div>
