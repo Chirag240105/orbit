@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-nebius}
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:?Set NEBIUS_API_KEY}
+      NEBIUS_BASE_URL: ${NEBIUS_BASE_URL:-https://api.tokenfactory.nebius.com/v1/}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      NVIDIA_BASE_URL: ${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      MODEL_PLANNER: ${MODEL_PLANNER:?Set MODEL_PLANNER}
+      MODEL_FAST: ${MODEL_FAST:?Set MODEL_FAST}
+      MODEL_EMBED: ${MODEL_EMBED:?Set MODEL_EMBED}
+      ORBIT_DATABASE_URL: ${ORBIT_DATABASE_URL:?Set managed PostgreSQL URL}
+      ORBIT_JWT_SECRET: ${ORBIT_JWT_SECRET:?Set stable JWT secret}
+      ORBIT_ALLOWED_ORIGINS: ${ORBIT_ALLOWED_ORIGINS:?Set public frontend origin}
+      ORBIT_EMBEDDING_DIMENSION: ${ORBIT_EMBEDDING_DIMENSION:-384}
+      ORBIT_PROVIDER_TIMEOUT_S: ${ORBIT_PROVIDER_TIMEOUT_S:-90}
+      ORBIT_PROVIDER_RETRIES: ${ORBIT_PROVIDER_RETRIES:-1}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${ORBIT_HTTP_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

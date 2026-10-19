@@ -30,7 +30,7 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 | 3D scene and camera panel | **Built; browser and device behavior not manually verified** |
 | MediaPipe hand gestures (point, pinch, open hand, swipe) | **Implemented on-device with mouse/keyboard fallback; 20+ FPS not verified on target devices** |
 | Alembic migrations | **Initial user-scoped schema implemented**; empty SQLite migration tested. PostgreSQL runtime not verified here. |
-| Public deployment and submission feedback assets | **Planned** (see `TASKS.md` and `docs/GAP_ANALYSIS.md`) |
+| Container deployment and submission feedback assets | **Prepared**; public deployment, managed PostgreSQL, seeded account, and HTTPS URL still need deployment credentials and verification (see [`docs/SUBMISSION.md`](docs/SUBMISSION.md)) |
 
 ## Architecture
 React frontend → JWT-authenticated FastAPI backend → PostgreSQL/pgvector and the model gateway. The backend owns provider keys, file policy, memory, and model calls. See `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/SECURITY_MODEL.md`.
@@ -56,6 +56,12 @@ cd frontend && npm install && npm run dev            # http://localhost:5173
 Or run both with `scripts/dev.sh` after installing each. Never commit `.env`.
 
 **Environment variables:** `LLM_PROVIDER` (`nebius`, `nvidia`, or `demo`), provider keys/URLs, `MODEL_PLANNER`, `MODEL_FAST`, `MODEL_EMBED`, `ORBIT_EMBEDDING_DIMENSION`, `ORBIT_DEMO_MODE`, `ORBIT_MOCK_AI`, `ORBIT_DATABASE_URL`, and security limits. Copy `.env.example`; use `python scripts/list_models.py` to inspect model IDs before setting model variables. The configured values in this example are placeholders, not verified model recommendations.
+
+## Deployment packaging
+
+`backend/Dockerfile` runs migrations and FastAPI; `frontend/Dockerfile` builds and serves the web app through Nginx, which proxies API and WebSocket requests. `docker-compose.app.yml` runs both containers against an external managed PostgreSQL database. Set `NEBIUS_API_KEY`, all three model IDs, a stable `ORBIT_JWT_SECRET`, `ORBIT_DATABASE_URL`, and the exact public `ORBIT_ALLOWED_ORIGINS`; keep secrets in the hosting platform's secret manager. Use a managed PostgreSQL service with pgvector and HTTPS ingress. See [`docs/SUBMISSION.md`](docs/SUBMISSION.md) for the architecture, model roles, deployment steps, and current submission status. The compose definition is packaging only: this repository does not claim a live public URL.
+
+After deployment, a reviewer account can be created and populated with synthetic examples by running `python scripts/seed_demo.py` with `ORBIT_API_BASE_URL`, `ORBIT_DEMO_EMAIL`, and `ORBIT_DEMO_PASSWORD` set. The script creates or logs into that account and adds sample memories and tasks idempotently. Share its credentials through the submission channel; do not commit them.
 
 Create an account on the ORBIT sign-in screen. Set a stable random `ORBIT_JWT_SECRET` for a deployment; if omitted, the backend generates a process-local secret, so sessions expire when it restarts.
 
