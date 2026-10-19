@@ -12,6 +12,7 @@ from app.auth import get_current_user
 from app.core.errors import AppError
 from app.core.ratelimit import RateLimiter
 from app.db.session import get_db
+from app.memory.service import store_user_memory
 from app.models import Conversation, Memory, Message, ProposedChange, SkillSetting, Task, Workspace
 from app.schemas import (
     ChangeOut,
@@ -82,7 +83,7 @@ def settings_info(request: Request):
 @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(chat_limit)])
 async def chat(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
     st = request.app.state
-    return await run_chat(req, db, st.settings, st.provider, st.registry)
+    return await run_chat(req, db, st.settings, st.provider, st.registry, st.model_gateway)
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
@@ -126,11 +127,8 @@ def list_memories(q: str = "", db: Session = Depends(get_db)):
 
 
 @router.post("/memories", response_model=MemoryOut, status_code=201)
-def create_memory(body: MemoryIn, db: Session = Depends(get_db)):
-    m = Memory(content=body.content, type=body.type, source=body.source, confirmed=body.source == "user")
-    db.add(m)
-    db.commit()
-    return m
+async def create_memory(body: MemoryIn, request: Request, db: Session = Depends(get_db)):
+    return await store_user_memory(db, body.content, body.type, request.app.state.model_gateway, body.source)
 
 
 @router.patch("/memories/{mid}", response_model=MemoryOut)

@@ -9,7 +9,7 @@ export function MemoryPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
-  const [type, setType] = useState("fact");
+  const [type, setType] = useState("USER");
   const [editing, setEditing] = useState<{ id: number; content: string } | null>(null);
   const [del, setDel] = useState<Memory | "all" | null>(null);
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ["memories", search], queryFn: () => api.memories(search) });
@@ -25,7 +25,7 @@ export function MemoryPage() {
         <div className="space-y-3">
           <Field label="What should ORBIT remember?"><textarea className={inputCls} rows={2} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="e.g. I use pnpm and prefer TypeScript strict mode" /></Field>
           <div className="flex items-center gap-2">
-            <select aria-label="Memory type" className="rounded-md border border-line bg-bg px-2 py-1.5 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{["fact", "preference", "project", "other"].map((t) => <option key={t}>{t}</option>)}</select>
+            <select aria-label="Memory type" className="rounded-md border border-line bg-bg px-2 py-1.5 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{["USER", "PROJECT", "TASK", "PREFERENCE", "DECISION", "EVENT", "CODE_CONTEXT", "VISION"].map((t) => <option key={t}>{t}</option>)}</select>
             <Button variant="primary" disabled={!draft.trim() || add.isPending} onClick={() => add.mutate()}>Save memory</Button>
           </div>
         </div>

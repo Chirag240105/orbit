@@ -1,6 +1,7 @@
 """Agent orchestration: route -> permission check -> retrieve context -> (consent) -> provider -> validate."""
 import json
 import re
+from collections import defaultdict
 
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -8,11 +9,12 @@ from sqlalchemy.orm import Session
 from app.audit.log import audit
 from app.config import Settings
 from app.core.errors import AppError
-from app.memory.service import retrieve_relevant
+from app.memory.service import gate_and_suggest, retrieve_relevant
 from app.models import Conversation, Message, SkillSetting, Workspace
 from app.providers.base import ChatProvider
 from app.schemas import ChatRequest, ChatResponse, ContextUsed, ProposedTask, ProviderInfo
 from app.security.redaction import fence_untrusted, redact
+from app.services.model_gateway import ModelGateway
 from app.skills.base import Skill, SkillContext
 from app.skills.registry import SkillRegistry
 from app.workspace.service import read_text
@@ -70,7 +72,10 @@ def _provider_info(p: ChatProvider) -> ProviderInfo:
     return ProviderInfo(name=p.name, model=p.model, is_demo=p.is_demo)
 
 
-async def run_chat(req: ChatRequest, db: Session, settings: Settings, provider: ChatProvider, registry: SkillRegistry) -> ChatResponse:
+async def run_chat(
+    req: ChatRequest, db: Session, settings: Settings, provider: ChatProvider,
+    registry: SkillRegistry, gateway: ModelGateway | None = None,
+) -> ChatResponse:
     if not provider.configured:
         await provider.complete([])  # raises provider_not_configured
     skill = pick_skill(req, registry, db)
@@ -126,8 +131,15 @@ async def run_chat(req: ChatRequest, db: Session, settings: Settings, provider: 
             {"files": [r for r, _ in trimmed], "chars": sum(len(t) for _, t in trimmed), "redactions": redactions, "provider": provider.name, "model": provider.model},
         )
 
-    memories = retrieve_relevant(db, req.message)
-    ctx = SkillContext(message=req.message, memories=[m.content for m in memories], files=trimmed)
+    memories = await retrieve_relevant(db, req.message, gateway)
+    grouped_memories: dict[str, list[str]] = defaultdict(list)
+    for memory in memories:
+        grouped_memories[memory.type].append(memory.content)
+    memory_context = "\n\n".join(
+        f"{memory_type}:\n" + "\n".join(f"- {content}" for content in contents)
+        for memory_type, contents in sorted(grouped_memories.items())
+    )
+    ctx = SkillContext(message=req.message, memories=[memory_context] if memory_context else [], files=trimmed)
     warnings: list[str] = []
     chars_sent = 0
 
@@ -155,6 +167,10 @@ async def run_chat(req: ChatRequest, db: Session, settings: Settings, provider: 
             warnings.append("The model's reply did not match the expected structure, so it is shown as plain text.")
         if trimmed:
             audit(db, "chat.external_send", provider=provider.name, files=len(trimmed), chars=chars_sent, redactions=redactions)
+
+    suggestion = output.get("suggested_memory")
+    if isinstance(suggestion, str) and suggestion.strip():
+        await gate_and_suggest(db, candidate=suggestion, user_text=req.message, gateway=gateway)
 
     proposed = [ProposedTask(**t) for t in output.get("tasks", [])] if skill.name == "task_plan" else []
     context = ContextUsed(memory_ids=[m.id for m in memories], files=[r for r, _ in trimmed], chars_sent=chars_sent, redactions=redactions, external=external)

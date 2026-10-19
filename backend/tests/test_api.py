@@ -36,6 +36,17 @@ def test_memory_crud_and_retrieval(demo):
     assert demo.get("/api/memories").json() == []
 
 
+def test_memory_deduplicates_same_type_and_updates_user_entry(demo):
+    async def similar_embedding(_texts):
+        return [[1.0, 0.0]]
+    demo.app.state.model_gateway.embed = similar_embedding
+    first = demo.post("/api/memories", json={"content": "I use PostgreSQL for ORBIT", "type": "PROJECT"}).json()
+    second = demo.post("/api/memories", json={"content": "ORBIT uses PostgreSQL", "type": "PROJECT"}).json()
+    assert second["id"] == first["id"]
+    assert second["content"] == "ORBIT uses PostgreSQL"
+    assert len(demo.get("/api/memories").json()) == 1
+
+
 def test_unconfirmed_suggestion_not_retrieved(demo):
     demo.post("/api/memories", json={"content": "likes pineapple pizza", "source": "chat_suggestion"})
     assert demo.post("/api/chat", json={"message": "pineapple pizza?"}).json()["context"]["memory_ids"] == []

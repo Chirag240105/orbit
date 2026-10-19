@@ -25,7 +25,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.jwt_secret = settings.jwt_secret or secrets.token_urlsafe(48)
     app.state.auth_rate_limit = RateLimiter(limit=10, window_s=60)
-    gateway = None if settings.demo_mode or settings.mock_ai or settings.llm_provider == "demo" else ModelGateway(settings)
+    gateway = ModelGateway(settings)
     app.state.model_gateway = gateway
     app.state.provider = build_provider(settings, gateway)
     app.state.registry = default_registry()

@@ -1,7 +1,17 @@
 from datetime import date, datetime, timezone
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -37,10 +47,12 @@ class Memory(Owned, Base):
     __tablename__ = "memories"
     id: Mapped[int] = mapped_column(primary_key=True)
     content: Mapped[str] = mapped_column(Text)
-    type: Mapped[str] = mapped_column(String(20), default="fact")
+    type: Mapped[str] = mapped_column(String(20), default="USER")
     source: Mapped[str] = mapped_column(String(30), default="user")
     confirmed: Mapped[bool] = mapped_column(Boolean, default=True)
     embedding: Mapped[list[float] | None] = mapped_column(JSON().with_variant(Vector(), "postgresql"), nullable=True)
+    importance: Mapped[float] = mapped_column(Float, default=0.5)
+    last_accessed: Mapped[datetime] = mapped_column(DateTime, default=_now)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 

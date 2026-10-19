@@ -1,7 +1,9 @@
 """OpenAI-compatible model gateway for chat, streaming, embeddings, and health checks."""
 
 import asyncio
+import hashlib
 import logging
+import math
 import re
 import time
 from collections.abc import AsyncIterator
@@ -159,6 +161,8 @@ class ModelGateway:
     async def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
+        if self.provider == "demo" or self.settings.mock_ai or self.settings.demo_mode:
+            return await asyncio.to_thread(self._demo_embeddings, texts)
         if self.provider != "demo" and self.settings.model_embed and self.api_key:
             try:
                 response = await self._request("POST", "embeddings", json_body={"model": self.settings.model_embed, "input": texts})
@@ -174,6 +178,17 @@ class ModelGateway:
             except (KeyError, TypeError, ValueError):
                 log.warning("model.embedding_invalid provider=%s model=%s fallback=sentence_transformers", self.provider, self.settings.model_embed)
         return await asyncio.to_thread(self._local_embeddings, texts)
+
+    def _demo_embeddings(self, texts: list[str]) -> list[list[float]]:
+        """Stable synthetic vectors for UI and tests; never used as production embeddings."""
+        dimension = self.settings.embedding_dimension
+        vectors = []
+        for text in texts:
+            raw = hashlib.shake_256(text.casefold().encode()).digest(dimension * 4)
+            vector = [int.from_bytes(raw[i:i + 4], "big") / 2**31 - 1 for i in range(0, len(raw), 4)]
+            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            vectors.append([value / norm for value in vector])
+        return vectors
 
     def _local_embeddings(self, texts: list[str]) -> list[list[float]]:
         if not self.settings.embedding_fallback_model:
@@ -191,7 +206,7 @@ class ModelGateway:
     async def check_reachability(self) -> dict[str, Any]:
         if self._reachability_checked_monotonic is not None and time.monotonic() - self._reachability_checked_monotonic < 30:
             return dict(self._reachability)
-        if self.provider == "demo":
+        if self.provider == "demo" or self.settings.mock_ai or self.settings.demo_mode:
             status = {"reachable": True, "checked_at": time.time(), "reason": "demo mode does not contact a provider"}
         elif not self.api_key:
             status = {"reachable": False, "checked_at": time.time(), "reason": "provider key is not configured"}

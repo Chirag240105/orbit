@@ -15,12 +15,12 @@ class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-MemType = Literal["fact", "preference", "project", "other"]
+MemType = Literal["USER", "PROJECT", "TASK", "PREFERENCE", "DECISION", "EVENT", "CODE_CONTEXT", "VISION"]
 
 
 class MemoryIn(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
-    type: MemType = "fact"
+    type: MemType = "USER"
     source: Literal["user", "chat_suggestion"] = "user"
 
 
@@ -36,6 +36,8 @@ class MemoryOut(ORM):
     type: str
     source: str
     confirmed: bool
+    importance: float
+    last_accessed: UtcDt
     created_at: UtcDt
     updated_at: UtcDt
 

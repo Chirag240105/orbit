@@ -13,12 +13,12 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 
 | Feature | Status |
 |---|---|
-| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 63 passed and 2 skipped in the current suite |
+| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 68 passed and 2 skipped in the current suite |
 | PostgreSQL + pgvector schema, Alembic migration, JWT auth and user scoping | **Implemented; migration verified on SQLite. PostgreSQL runtime not verified here.** |
 | Chat orchestration, skill registry (4 skills), schema-validated output | **Working** (tested with demo provider and mocked HTTP) |
 | Nebius and NVIDIA OpenAI-compatible gateway | **Gateway implemented; live calls unverified.** Choose task model IDs with `scripts/list_models.py`; needs a provider key |
 | Demo mode (`LLM_PROVIDER=demo`, `ORBIT_DEMO_MODE=true`, or `ORBIT_MOCK_AI=true`) | **Deterministic placeholder**: labeled "Demo", no model call |
-| Memory (add, edit, search, confirm, delete, delete all) | **Working** (keyword retrieval, not embeddings) |
+| Memory (typed records, embeddings, importance/recency ranking, dedupe, confirmation and deletion) | **Implemented; provider embeddings and local fallback need live verification. Demo retrieval uses keyword matching.** |
 | Workspace policy, read-only inspection, proposal and approval flow | **Working**, unit and API tested |
 | Secret redaction, consent before external send | **Working**, best-effort redaction |
 | All 8 main screens | **Built**; typecheck, 11 frontend tests and production build pass. **Not yet reviewed in a real browser** |
