@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.agent.orchestrator import enabled_names, run_chat
 from app.api.deps import get_workspace, tool_ctx
 from app.audit.log import audit
+from app.auth import get_current_user
 from app.core.errors import AppError
 from app.core.ratelimit import RateLimiter
 from app.db.session import get_db
@@ -36,7 +37,7 @@ from app.tools.registry import TOOLS, execute_tool
 from app.workspace import service as wsvc
 from app.workspace.policy import validate_workspace_root
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
 chat_limit = RateLimiter(limit=30, window_s=60)
 VERSION = "0.1.0"
 
@@ -174,7 +175,7 @@ def skills(request: Request, db: Session = Depends(get_db)):
 def toggle_skill(name: str, body: SkillPatch, request: Request, db: Session = Depends(get_db)):
     if request.app.state.registry.get(name) is None:
         raise AppError("not_found", "Skill not found.", 404)
-    row = db.get(SkillSetting, name) or SkillSetting(name=name)
+    row = db.scalar(select(SkillSetting).where(SkillSetting.name == name)) or SkillSetting(name=name)
     row.enabled = body.enabled
     db.add(row)
     db.commit()

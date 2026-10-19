@@ -56,3 +56,13 @@ def test_tasks_flow(client):
 def test_cors_rejects_unknown_origin(client):
     r = client.get("/api/health", headers={"Origin": "http://evil.example"})
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_allows_authorization_header_from_configured_origin(client):
+    r = client.options("/api/tasks", headers={
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization",
+    })
+    assert r.status_code == 200
+    assert "authorization" in r.headers["access-control-allow-headers"].lower()

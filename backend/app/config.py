@@ -14,7 +14,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"), extra="ignore", populate_by_name=True
     )
-    database_url: str = Field("sqlite:///./orbit.db", validation_alias=_alias("ORBIT_DATABASE_URL", "database_url"))
+    database_url: str = Field(
+        "postgresql+psycopg://orbit:orbit-dev-only@localhost:5432/orbit",
+        validation_alias=_alias("ORBIT_DATABASE_URL", "database_url"),
+    )
+    jwt_secret: str | None = Field(None, validation_alias=_alias("ORBIT_JWT_SECRET", "jwt_secret"))
+    jwt_lifetime_minutes: int = Field(60, ge=5, le=10080, validation_alias=_alias("ORBIT_JWT_LIFETIME_MINUTES", "jwt_lifetime_minutes"))
     llm_provider: Literal["nebius", "nvidia", "demo"] = Field(
         "nebius", validation_alias=_alias("LLM_PROVIDER", "llm_provider")
     )

@@ -11,7 +11,10 @@ def hosted_client(handler):
     import app.providers.nebius as nb
     real = httpx.AsyncClient
     nb.httpx.AsyncClient = lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
-    return TestClient(app, raise_server_exceptions=False), lambda: setattr(nb.httpx, "AsyncClient", real)
+    client = TestClient(app, raise_server_exceptions=False)
+    auth = client.post("/api/auth/register", json={"email": "provider@example.com", "password": "test-password-123"}).json()
+    client.headers["Authorization"] = f"Bearer {auth['access_token']}"
+    return client, lambda: setattr(nb.httpx, "AsyncClient", real)
 
 
 def ok(request):

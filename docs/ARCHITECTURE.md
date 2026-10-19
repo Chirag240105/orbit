@@ -1,7 +1,7 @@
 # Architecture
 
 ```
-Browser (React, :5173) --/api--> FastAPI (:8000) --> SQLite (orbit.db)
+Browser (React, :5173) --JWT /api--> FastAPI (:8000) --> PostgreSQL + pgvector
                                    |-- agent/orchestrator --> services/model_gateway (Nebius | NVIDIA | demo)
                                    |-- skills/ (registry)      memory/ (retrieval)
                                    `-- tools/ --> workspace/policy.py --> authorized folders on disk
@@ -24,7 +24,6 @@ Browser (React, :5173) --/api--> FastAPI (:8000) --> SQLite (orbit.db)
 See `THREAT_MODEL.md`. In short: the model and all retrieved text are untrusted; the only code that touches the disk is `workspace/`; the API key never leaves the backend.
 
 ## Decisions
-- **Single FastAPI process + SQLite:** simplest thing two people can debug. Postgres later by changing `ORBIT_DATABASE_URL` (SQLAlchemy).
+- **FastAPI + PostgreSQL/pgvector:** per-user records use a session-scoped ORM filter. Schema changes run through Alembic; in-memory SQLite is reserved for tests.
 - **No model-driven tool loop in the MVP.** Tools run only from user-initiated API calls. This removes the largest prompt-injection risk until it can be properly tested (task SEC-05).
-- **Keyword memory retrieval, no vector DB.** Embeddings are task AI-06 once there's a reason.
-- **Local web app first.** Desktop packaging (Tauri) is task IN-04.
+- **Keyword retrieval for now.** The memory schema has a pgvector column; embedding-based retrieval and writes are Phase 2 work.

@@ -6,14 +6,26 @@ export class ApiError extends Error {
   }
 }
 
+const TOKEN_KEY = "orbit.accessToken";
+export const readAuthToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
+export const saveAuthToken = (token: string | null) => { try { token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ } };
+
 export async function request<R>(method: string, path: string, body?: unknown): Promise<R> {
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
+    const token = readAuthToken();
+    const headers: Record<string, string> = {};
+    if (body) headers["Content-Type"] = "application/json";
+    if (token) headers.Authorization = `Bearer ${token}`;
+    res = await fetch(`/api${path}`, { method, headers: Object.keys(headers).length ? headers : undefined, body: body ? JSON.stringify(body) : undefined });
   } catch {
     throw new ApiError("backend_unreachable", "Can't reach the ORBIT backend. Start it with `uvicorn app.main:app_factory --factory` in /backend.", 0);
   }
   if (res.status === 204) return undefined as R;
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    saveAuthToken(null);
+    window.dispatchEvent(new Event("orbit:auth-expired"));
+  }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const e = data?.error;
@@ -55,4 +67,5 @@ export const api = {
   addTask: (b: Partial<T.Task> & { title: string }) => request<T.Task>("POST", "/tasks", b),
   patchTask: (id: number, b: Partial<T.Task>) => request<T.Task>("PATCH", `/tasks/${id}`, b),
   deleteTask: (id: number) => request<void>("DELETE", `/tasks/${id}`),
+  authenticate: (mode: "login" | "register", email: string, password: string) => request<{ access_token: string; token_type: string }>("POST", `/auth/${mode}`, { email, password }),
 };

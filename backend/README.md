@@ -1,12 +1,16 @@
 # ORBIT backend
 
-FastAPI + SQLAlchemy + Pydantic. Runs locally on `127.0.0.1:8000`.
+FastAPI + SQLAlchemy + Pydantic. Runs on `127.0.0.1:8000`; PostgreSQL with
+pgvector is the configured datastore. Alembic manages the schema; production
+tables are not created automatically at startup. Tests use in-memory SQLite.
 
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 cp ../.env.example ../.env          # then edit
+cd .. && docker compose up -d db
+cd backend && alembic upgrade head
 uvicorn app.main:app_factory --factory --reload
 pytest -q && ruff check app tests
 ```
