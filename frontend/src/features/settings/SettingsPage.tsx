@@ -11,6 +11,8 @@ export function SettingsPage() {
   const health = useQuery({ queryKey: ["health"], queryFn: api.health });
   const info = useQuery({ queryKey: ["settings"], queryFn: api.settings });
   const ws = useQuery({ queryKey: ["workspaces"], queryFn: api.workspaces });
+  const debug = useQuery({ queryKey: ["debug-turns"], queryFn: api.debugTurns });
+  const toolPermissions = useQuery({ queryKey: ["tool-permissions"], queryFn: api.toolPermissions });
   const [danger, setDanger] = useState<Danger>(null);
   const [cam, setCam] = useState("unknown");
   useEffect(() => {
@@ -42,6 +44,10 @@ export function SettingsPage() {
         <p className="mb-3 text-sm text-muted">Tools are checked by the backend on every call. The model cannot run shell commands or reach files outside an authorized workspace.</p>
         <table className="w-full text-left text-sm"><thead className="text-xs text-muted"><tr><th className="pb-1 font-medium">Tool</th><th className="pb-1 font-medium">Needs</th><th className="pb-1 font-medium">Confirmation</th></tr></thead>
           <tbody>{info.data?.tools.map((t) => <tr key={t.name} className="border-t border-line"><td className="py-1.5"><span className="font-mono text-xs">{t.name}</span><span className="block text-xs text-muted">{t.description}</span></td><td>{t.permissions.map((x) => <Badge key={x}>{x}</Badge>)}</td><td>{t.requires_confirmation ? "Required each time" : "Not needed"}</td></tr>)}</tbody></table>
+        <div className="mt-3 space-y-2">{toolPermissions.data?.map((tool) => <label key={tool.tool_name} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={tool.trusted_for_session} onChange={(e) => api.setToolTrust(tool.tool_name, e.target.checked).then(() => qc.invalidateQueries({ queryKey: ["tool-permissions"] }))} /> Allow {tool.tool_name} without asking again (stored until turned off)</label>)}</div>
+      </Panel>
+      <Panel title="Recent debug turns">
+        {debug.isLoading ? <Skeleton className="h-12" /> : !debug.data?.length ? <p className="text-sm text-muted">No recent turns.</p> : <div className="space-y-2">{[...debug.data].reverse().slice(0, 10).map((turn, i) => <details key={i} className="rounded border border-line p-2 text-xs"><summary className="cursor-pointer">{String(turn.intent)} · {String(turn.provider)} / {String(turn.model)} · {String(turn.total_latency_ms)} ms</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{JSON.stringify(turn, null, 2)}</pre></details>)}</div>}
       </Panel>
       <Panel title="Camera">
         <p className="text-sm">Browser permission: <Badge color={cam === "granted" ? "warn" : "neutral"}>{cam}</Badge></p>

@@ -35,8 +35,24 @@ def test_debug_endpoint_keeps_recent_turn_metadata(demo):
     turns = demo.get("/api/debug/last-turns").json()
     assert len(turns) == 1
     assert turns[0]["provider"] == "demo" and turns[0]["tool_calls"] == []
+    assert "user_id" not in turns[0]
 
 
 def test_model_tool_arguments_cannot_self_grant_external_consent():
     args = AnalyzeCodeArgs(workspace_id=1, path="src/app.py", consent_external=True)
     assert not hasattr(args, "consent_external")
+
+
+def test_websocket_chat_sends_event_protocol(demo):
+    token = demo.headers["Authorization"].removeprefix("Bearer ")
+    with demo.websocket_connect("/ws/chat") as socket:
+        socket.send_json({"token": token, "request": {"message": "hello"}})
+        events = []
+        while True:
+            frame = socket.receive_json()
+            events.append(frame["event"])
+            if frame["event"] in {"done", "error"}:
+                assert frame["event"] == "done"
+                assert frame["data"]["output"]["answer"].startswith("[Demo mode")
+                break
+    assert "token" in events and "memory_recalled" in events and "debug" in events

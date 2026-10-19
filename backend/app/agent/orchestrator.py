@@ -117,7 +117,7 @@ def _provider_info(p: ChatProvider) -> ProviderInfo:
 
 async def run_chat(
     req: ChatRequest, db: Session, settings: Settings, provider: ChatProvider,
-    registry: SkillRegistry, gateway: ModelGateway | None = None, debug_log=None,
+    registry: SkillRegistry, gateway: ModelGateway | None = None, debug_log=None, on_event=None,
 ) -> ChatResponse:
     started = perf_counter()
     if not provider.configured:
@@ -178,6 +178,8 @@ async def run_chat(
         )
 
     memories = await retrieve_relevant(db, req.message, gateway)
+    if on_event is not None:
+        await on_event("memory_recalled", {"memory_ids": [m.id for m in memories]})
     grouped_memories: dict[str, list[str]] = defaultdict(list)
     for memory in memories:
         grouped_memories[memory.type].append(memory.content)
@@ -195,6 +197,8 @@ async def run_chat(
     if provider.is_demo:
         output = skill.demo_output(ctx)
         warnings.append("Demo mode: deterministic placeholder output. No model was called.")
+        if on_event is not None:
+            await on_event("token", {"text": str(output.get("answer", output.get("summary", "Demo response ready.")))})
     else:
         schema = json.dumps(skill.output_model.model_json_schema().get("properties", {}))
         parts = [f"<user_request>\n{skill.user_prompt(ctx)}\n</user_request>"]
@@ -226,9 +230,13 @@ async def run_chat(
                         name, call.get("arguments", {}), db, settings, gateway,
                         consent_external=req.consent_external,
                     )
+                    if on_event is not None:
+                        await on_event("tool_call", {"name": name, "status": result_tool.get("status")})
                     executed_tool_calls.append({"name": name, "status": result_tool.get("status")})
                     if result_tool.get("status") == "pending":
                         pending_actions.append(result_tool)
+                        if on_event is not None:
+                            await on_event("pending_action", result_tool)
                     tool_results.append(result_tool)
                 except AppError as exc:
                     tool_results.append({"status": "error", "error": exc.code, "message": exc.message})
@@ -257,13 +265,15 @@ async def run_chat(
     proposed = [ProposedTask(**t) for t in output.get("tasks", [])] if skill.name == "task_plan" else []
     context = ContextUsed(memory_ids=[m.id for m in memories], files=[r for r, _ in trimmed], chars_sent=chars_sent, redactions=redactions, external=external)
     db.add(Message(conversation_id=conv.id, role="user", content=req.message))
-    a = Message(conversation_id=conv.id, role="assistant", content=json.dumps(output), skill=skill.name, meta={"provider": _provider_info(provider).model_dump(), "context": context.model_dump(), "warnings": warnings})
+    a = Message(conversation_id=conv.id, role="assistant", content=json.dumps(output), skill=skill.name, meta={"provider": _provider_info(provider).model_dump(), "context": context.model_dump(), "warnings": warnings, "intent": intent, "tool_calls": executed_tool_calls, "pending_actions": pending_actions})
     db.add(a)
     db.commit()
     if debug_log is not None:
-        debug_log.append({
+        turn_debug = {
+            "user_id": db.info.get("user_id"),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "provider": provider.name,
+            "endpoint": settings.nebius_base_url if settings.llm_provider == "nebius" else settings.nvidia_base_url if settings.llm_provider == "nvidia" else None,
             "model": provider_stats.get("model", provider.model),
             "latency_ms": provider_stats.get("latency_ms"),
             "tokens": {"prompt": provider_stats.get("prompt_tokens"), "completion": provider_stats.get("completion_tokens")},
@@ -272,5 +282,8 @@ async def run_chat(
             "intent": intent,
             "retrieved_memory_ids": [m.id for m in memories],
             "tool_calls": executed_tool_calls,
-        })
+        }
+        debug_log.append(turn_debug)
+        if on_event is not None:
+            await on_event("debug", {k: v for k, v in turn_debug.items() if k != "user_id"})
     return ChatResponse(conversation_id=conv.id, message_id=a.id, skill=skill.name, output=output, provider=_provider_info(provider), context=context, proposed_tasks=proposed, warnings=warnings, intent=intent, tool_calls=executed_tool_calls, pending_actions=pending_actions)

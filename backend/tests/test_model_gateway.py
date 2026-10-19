@@ -80,6 +80,18 @@ def test_gateway_streams_openai_compatible_deltas(monkeypatch):
     assert asyncio.run(collect()) == ["hello", " world"]
 
 
+def test_gateway_stream_does_not_emit_reasoning_tags(monkeypatch):
+    payload = (
+        'data: {"choices":[{"delta":{"content":"Before <thi"}}]}\n\n'
+        'data: {"choices":[{"delta":{"content":"nk>private thought</think>After"}}]}\n\n'
+        "data: [DONE]\n\n"
+    )
+    mock_client(monkeypatch, lambda _request: httpx.Response(200, text=payload))
+    async def collect():
+        return "".join([chunk async for chunk in gateway(nebius_api_key="test", model_planner="planner").stream([])])
+    assert asyncio.run(collect()) == "Before After"
+
+
 def test_model_names_are_required_per_task():
     with pytest.raises(AppError) as error:
         gateway().model_for("fast")

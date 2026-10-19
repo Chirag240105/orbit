@@ -158,8 +158,8 @@ async def reject_pending_action(action_id: int, request: Request, db: Session = 
 
 
 @router.get("/debug/last-turns")
-def last_turns(request: Request):
-    return list(request.app.state.last_turns)
+def last_turns(request: Request, user=Depends(get_current_user)):
+    return [{k: v for k, v in row.items() if k != "user_id"} for row in request.app.state.last_turns if row.get("user_id") == user.id]
 
 
 @router.get("/conversations", response_model=list[ConversationOut])

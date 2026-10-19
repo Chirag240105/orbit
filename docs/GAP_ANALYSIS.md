@@ -7,10 +7,11 @@ verification.
 
 ## Implementation progress
 
-Phases 0–3 are implemented on sequential feature branches. Phase 3 adds six
+Phases 0–4 are implemented on sequential feature branches. Phase 3 adds six
 intent labels, a maximum of three model tool rounds, typed tool arguments,
-metadata-only audit records, and approval-gated writes. The schedule tool is a
-registered placeholder and the chat UI does not yet render tool approval cards.
+metadata-only audit records, and approval-gated writes. Phase 4 adds an
+authenticated WebSocket event stream, approval and memory UI, answer rationale,
+and per-user debug turns. The schedule tool is a registered placeholder.
 Verification results and remaining limits are kept in the README feature table.
 
 ## Current repository

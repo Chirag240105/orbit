@@ -10,7 +10,8 @@ export type ChatResponse = {
   provider: { name: string; model: string; is_demo: boolean }; context: ContextUsed; proposed_tasks: ProposedTask[]; warnings: string[];
   intent: "chat" | "plan_day" | "task_op" | "memory_op" | "code_q" | "vision_ctx"; tool_calls: { name: string; status: string }[]; pending_actions: Record<string, unknown>[];
 };
-export type Message = { id: number; role: "user" | "assistant"; content: string | Record<string, unknown>; skill: string | null; meta: { provider?: ChatResponse["provider"]; context?: ContextUsed; warnings?: string[] } | null; created_at: string };
+export type PendingAction = { pending_action_id: number; tool_name: string; status: "pending" };
+export type Message = { id: number; role: "user" | "assistant"; content: string | Record<string, unknown>; skill: string | null; meta: { provider?: ChatResponse["provider"]; context?: ContextUsed; warnings?: string[]; intent?: ChatResponse["intent"]; tool_calls?: ChatResponse["tool_calls"]; pending_actions?: PendingAction[] } | null; created_at: string };
 export type Skill = { name: string; title: string; description: string; required_permissions: string[]; requires_files: boolean; enabled: boolean; input_schema: SchemaDoc; output_schema: SchemaDoc };
 export type SchemaDoc = { properties?: Record<string, { type?: string; description?: string; title?: string }>; required?: string[] };
 export type Workspace = { id: number; name: string; path: string; allow_write: boolean; created_at: string };

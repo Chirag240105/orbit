@@ -13,20 +13,21 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 
 | Feature | Status |
 |---|---|
-| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 73 passed and 2 skipped in the current suite |
+| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 75 passed and 2 skipped in the current suite |
 | PostgreSQL + pgvector schema, Alembic migration, JWT auth and user scoping | **Implemented; migration verified on SQLite. PostgreSQL runtime not verified here.** |
 | Chat orchestration, skill registry (4 skills), schema-validated output | **Working** (tested with demo provider and mocked HTTP) |
 | Nebius and NVIDIA OpenAI-compatible gateway | **Gateway implemented; live calls unverified.** Choose task model IDs with `scripts/list_models.py`; needs a provider key |
 | Demo mode (`LLM_PROVIDER=demo`, `ORBIT_DEMO_MODE=true`, or `ORBIT_MOCK_AI=true`) | **Deterministic placeholder**: labeled "Demo", no model call |
 | Memory (typed records, embeddings, importance/recency ranking, dedupe, confirmation and deletion) | **Implemented; provider embeddings and local fallback need live verification. Demo retrieval uses keyword matching.** |
 | Agent intent routing and tools | **Implemented**: six intent labels; validated task, note, memory, code, and vision tools; reads are audited, writes require approval by default; max three model tool rounds. Schedule generation is registered but not implemented. |
+| Streaming chat and decision UI | **Implemented**: authenticated WebSocket event stream (POST `/api/chat` remains available), memory chips, action approval cards, answer rationale, and per-user debug turns. Live provider streaming not verified. |
 | Workspace policy, read-only inspection, proposal and approval flow | **Working**, unit and API tested |
 | Secret redaction, consent before external send | **Working**, best-effort redaction |
 | All 8 main screens | **Built**; typecheck, 11 frontend tests and production build pass. **Not yet reviewed in a real browser** |
 | 3D scene and camera panel | **Built, not verified in a browser or on a device** |
 | OpenCV / MediaPipe recognition | **Not implemented** (tasks CV-01, CV-02) |
 | Alembic migrations | **Initial user-scoped schema implemented**; empty SQLite migration tested. PostgreSQL runtime not verified here. |
-| Streaming UI, schedule generation, VS Code extension | **Planned** (see `TASKS.md` and `docs/GAP_ANALYSIS.md`) |
+| Schedule generation, VS Code extension, gesture recognition | **Planned** (see `TASKS.md` and `docs/GAP_ANALYSIS.md`) |
 
 ## Architecture
 React frontend → JWT-authenticated FastAPI backend → PostgreSQL/pgvector and the model gateway. The backend owns provider keys, file policy, memory, and model calls. See `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/SECURITY_MODEL.md`.
@@ -69,7 +70,7 @@ Create an account on the ORBIT sign-in screen. Set a stable random `ORBIT_JWT_SE
 - *`workspace_too_broad`:* choose a project folder, not `/`, your home folder, or a top-level system folder.
 
 ## Limitations
-Account registration/login and user-scoped records are implemented. Set a stable random `ORBIT_JWT_SECRET` for deployments; without it, the backend generates a process-local secret and existing login tokens expire when it restarts. Redaction is pattern-based and incomplete. Tool approval cards are not yet integrated into chat UI, schedule generation is a placeholder, and trusted tool permissions are stored in the database. Camera gesture recognition does not exist. Demo memory retrieval uses keyword matching.
+Account registration/login and user-scoped records are implemented. Set a stable random `ORBIT_JWT_SECRET` for deployments; without it, the backend generates a process-local secret and existing login tokens expire when it restarts. Redaction is pattern-based and incomplete. Schedule generation is a placeholder, and trusted tool permissions are stored in the database until turned off. Camera gesture recognition does not exist. Demo memory retrieval uses keyword matching.
 
 ## Team and contributing
 Chirag: AI agent, backend architecture, integrations, security. Charanjeet: frontend, UI/UX, visual learning, integration. Work from `TASKS.md`; process in `docs/TEAM_WORKFLOW.md` and `CONTRIBUTING.md`. To add a feature, a skill, or a screen: `docs/EXTENDING.md`, `docs/SKILL_DEVELOPMENT.md`.

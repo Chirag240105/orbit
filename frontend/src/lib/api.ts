@@ -34,12 +34,46 @@ export async function request<R>(method: string, path: string, body?: unknown): 
   return data as R;
 }
 
+export function chatStream(req: T.ChatRequest, onEvent?: (event: string, data: Record<string, unknown>) => void): Promise<T.ChatResponse> {
+  if (typeof WebSocket === "undefined") return api.chat(req);
+  return new Promise((resolve, reject) => {
+    const token = readAuthToken();
+    if (!token) return reject(new ApiError("authentication_required", "Sign in to chat with ORBIT.", 401));
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    let socket: WebSocket;
+    try { socket = new WebSocket(`${protocol}//${window.location.host}/ws/chat`); }
+    catch { api.chat(req).then(resolve, reject); return; }
+    let settled = false;
+    socket.onopen = () => socket.send(JSON.stringify({ token, request: req }));
+    socket.onmessage = (message) => {
+      let frame: { event: string; data: Record<string, unknown> };
+      try { frame = JSON.parse(message.data); } catch { return; }
+      onEvent?.(frame.event, frame.data ?? {});
+      if (frame.event === "auth_expired") { saveAuthToken(null); window.dispatchEvent(new Event("orbit:auth-expired")); }
+      if (frame.event === "done") { settled = true; resolve(frame.data as unknown as T.ChatResponse); socket.close(); }
+      if (frame.event === "error") {
+        settled = true;
+        const details = frame.data.details as Record<string, unknown> | null;
+        reject(new ApiError(String(frame.data.code ?? "unknown_error"), String(frame.data.message ?? "Chat failed."), frame.data.code === "consent_required" ? 409 : 500, details));
+        socket.close();
+      }
+    };
+    socket.onerror = () => { if (!settled) reject(new ApiError("backend_unreachable", "Can't reach the ORBIT chat stream.", 0)); };
+    socket.onclose = (event) => { if (!settled) reject(new ApiError("stream_closed", `Chat stream closed (${event.code}).`, event.code === 4401 ? 401 : 0)); };
+  });
+}
+
 const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
 
 export const api = {
   health: () => request<T.Health>("GET", "/health"),
   settings: () => request<T.SettingsInfo>("GET", "/settings"),
   chat: (b: T.ChatRequest) => request<T.ChatResponse>("POST", "/chat", b),
+  approveAction: (id: number) => request<{ id: number; status: string }>("POST", `/actions/${id}/approve`),
+  rejectAction: (id: number) => request<{ id: number; status: string }>("POST", `/actions/${id}/reject`),
+  debugTurns: () => request<Record<string, unknown>[]>("GET", "/debug/last-turns"),
+  toolPermissions: () => request<{ tool_name: string; trusted_for_session: boolean }[]>("GET", "/tool-permissions"),
+  setToolTrust: (name: string, trusted_for_session: boolean) => request<{ tool_name: string; trusted_for_session: boolean }>("PATCH", `/tool-permissions/${name}`, { trusted_for_session }),
   conversations: () => request<T.Conversation[]>("GET", "/conversations"),
   messages: (id: number) => request<T.Message[]>("GET", `/conversations/${id}/messages`),
   deleteConversation: (id: number) => request<void>("DELETE", `/conversations/${id}`),

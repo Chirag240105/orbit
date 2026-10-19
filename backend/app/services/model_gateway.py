@@ -118,6 +118,9 @@ class ModelGateway:
         self._require_configured()
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         prompt_tokens = completion_tokens = None
+        think_buffer = ""
+        inside_think = False
+        visible_any = False
         try:
             for attempt in range(self.settings.provider_retries + 1):
                 emitted = False
@@ -144,14 +147,47 @@ class ModelGateway:
                                     choice = chunk.get("choices", [{}])[0]
                                     delta = choice.get("delta", {}).get("content")
                                     if isinstance(delta, str) and delta:
-                                        emitted = True
-                                        yield delta
+                                        think_buffer += delta
+                                        while think_buffer:
+                                            lower = think_buffer.lower()
+                                            if inside_think:
+                                                end = lower.find("</think>")
+                                                if end < 0:
+                                                    think_buffer = think_buffer[-8:]
+                                                    break
+                                                think_buffer = think_buffer[end + len("</think>"):]
+                                                inside_think = False
+                                                continue
+                                            start = lower.find("<think>")
+                                            if start >= 0:
+                                                visible = think_buffer[:start]
+                                                think_buffer = think_buffer[start + len("<think>"):]
+                                                inside_think = True
+                                                if visible:
+                                                    emitted = True
+                                                    visible_any = True
+                                                    yield visible
+                                                continue
+                                            safe = max(0, len(think_buffer) - len("<think>") + 1)
+                                            if safe:
+                                                visible, think_buffer = think_buffer[:safe], think_buffer[safe:]
+                                                emitted = True
+                                                visible_any = True
+                                                yield visible
+                                            break
                                 except (ValueError, KeyError, IndexError, TypeError):
                                     continue
+                            if not inside_think and think_buffer:
+                                emitted = True
+                                visible_any = True
+                                yield think_buffer
+                                think_buffer = ""
                     break
                 except httpx.HTTPError:
                     if attempt >= self.settings.provider_retries or emitted:
                         raise
+            if not visible_any:
+                raise AppError("provider_empty_response", "The model returned no visible answer; reasoning may have used the token budget. Try again.", 502)
         except httpx.HTTPError:
             raise AppError("provider_unreachable", "Could not reach the model provider. Check the network and provider URL.", 502) from None
         finally:
