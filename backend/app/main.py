@@ -8,6 +8,7 @@ from app.config import Settings
 from app.core.errors import install_error_handlers
 from app.db.session import init_db
 from app.providers import build_provider
+from app.services.model_gateway import ModelGateway
 from app.skills.registry import default_registry
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -19,7 +20,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     init_db(settings.database_url)
     app = FastAPI(title="ORBIT API", version=VERSION, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.state.settings = settings
-    app.state.provider = build_provider(settings)
+    gateway = None if settings.demo_mode or settings.mock_ai or settings.llm_provider == "demo" else ModelGateway(settings)
+    app.state.model_gateway = gateway
+    app.state.provider = build_provider(settings, gateway)
     app.state.registry = default_registry()
     app.add_middleware(
         CORSMiddleware, allow_origins=settings.origins, allow_methods=["GET", "POST", "PATCH", "DELETE"],

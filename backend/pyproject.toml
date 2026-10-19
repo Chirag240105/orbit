@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
+embeddings = ["sentence-transformers>=3"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,8 +1,8 @@
 # Architecture
 
 ```
-Browser (React, :5173) --/api--> FastAPI (127.0.0.1:8000) --> SQLite (orbit.db)
-                                   |-- agent/orchestrator --> providers/ (Nebius | demo | unconfigured)
+Browser (React, :5173) --/api--> FastAPI (:8000) --> SQLite (orbit.db)
+                                   |-- agent/orchestrator --> services/model_gateway (Nebius | NVIDIA | demo)
                                    |-- skills/ (registry)      memory/ (retrieval)
                                    `-- tools/ --> workspace/policy.py --> authorized folders on disk
 ```
@@ -14,7 +14,7 @@ Browser (React, :5173) --/api--> FastAPI (127.0.0.1:8000) --> SQLite (orbit.db)
 4. If a hosted model would receive file text and `consent_external` is false, the API returns `409 consent_required` with a preview (files, characters, redaction count). The UI shows a confirm dialog.
 5. Matching **confirmed** memories are retrieved (keyword overlap).
 6. Prompt: trusted system text + skill instructions + JSON schema; memories and files are wrapped in `<untrusted_data>` fences.
-7. Provider returns text; the orchestrator parses JSON and validates it against the skill's Pydantic model. On mismatch it falls back to plain text and adds a warning.
+7. The model gateway routes through the configured OpenAI-compatible provider and model, with a timeout and one retry. It strips reasoning tags, records provider/model/token/latency metadata, and returns text; the orchestrator parses JSON and validates it against the skill's Pydantic model. On mismatch it falls back to plain text and adds a warning.
 8. Result and metadata (never file contents) are stored; `chat.external_send` is audited when file text left the machine.
 
 ## Request flow: file change

@@ -1,6 +1,8 @@
 def test_health(client):
     j = client.get("/api/health").json()
     assert j["status"] == "ok" and j["provider"]["configured"] is False
+    assert j["provider"]["name"] == "nebius"
+    assert j["provider"]["reachability"]["reachable"] is False
 
 
 def test_chat_unconfigured_is_explicit(client):

@@ -7,7 +7,7 @@ from app.main import create_app
 
 
 def hosted_client(handler):
-    app = create_app(Settings(database_url="sqlite://", _env_file=None, nebius_api_key="test-key-not-real"))
+    app = create_app(Settings(database_url="sqlite://", _env_file=None, nebius_api_key="test-key-not-real", model_planner="test-planner-model"))
     import app.providers.nebius as nb
     real = httpx.AsyncClient
     nb.httpx.AsyncClient = lambda **kw: real(transport=httpx.MockTransport(handler), **kw)

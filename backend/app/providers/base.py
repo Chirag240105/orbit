@@ -7,6 +7,10 @@ class ProviderResult:
     text: str
     model: str
     is_demo: bool = False
+    provider: str = "unknown"
+    latency_ms: int | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
 
 class ChatProvider(ABC):

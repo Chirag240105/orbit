@@ -43,12 +43,19 @@ VERSION = "0.1.0"
 
 # ---------- health & settings ----------
 @router.get("/health")
-def health(request: Request, db: Session = Depends(get_db)):
+async def health(request: Request, db: Session = Depends(get_db)):
     p, s = request.app.state.provider, request.app.state.settings
     db.execute(select(1))
+    gateway = request.app.state.model_gateway
+    reachability = await gateway.check_reachability() if gateway else {
+        "reachable": bool(p.is_demo), "checked_at": None,
+        "reason": "demo mode" if p.is_demo else "provider is not configured",
+    }
     return {
         "status": "ok", "version": VERSION, "database": "ok",
-        "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo, "demo_mode": s.demo_mode},
+        "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo,
+                     "demo_mode": s.demo_mode or s.mock_ai, "endpoint": (s.nebius_base_url if s.llm_provider == "nebius" else s.nvidia_base_url) if s.llm_provider != "demo" else None,
+                     "reachability": reachability},
     }
 
 
@@ -56,7 +63,8 @@ def health(request: Request, db: Session = Depends(get_db)):
 def settings_info(request: Request):
     s, p = request.app.state.settings, request.app.state.provider
     return {
-        "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo, "hosted": p.name == "nebius"},
+        "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo, "hosted": p.name in ("nebius", "nvidia"),
+                     "endpoint": (s.nebius_base_url if s.llm_provider == "nebius" else s.nvidia_base_url) if s.llm_provider != "demo" else None},
         "limits": {"max_file_bytes": s.max_file_bytes, "max_context_chars": s.max_context_chars},
         "tools": [{"name": t.name, "description": t.description, "permissions": list(t.permissions), "requires_confirmation": t.requires_confirmation} for t in TOOLS.values()],
         "privacy": [
