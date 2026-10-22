@@ -13,7 +13,7 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 
 | Feature | Status |
 |---|---|
-| Backend API, error handling, CORS, chat/auth rate limits, audit | **Verified by tests:** 88 passed, 2 skipped; Ruff passes. Two platform-dependent tests are skipped. |
+| Backend API, error handling, CORS, chat/auth rate limits, audit | **Verified:** 88 tests passed, 2 skipped; Ruff passes. A fresh SQLite startup migration and `/health`, authenticated `/api/memory`, and `/api/schedule?date=today` smoke checks also passed. Two platform-dependent tests are skipped. |
 | PostgreSQL + pgvector schema, Alembic migration, JWT auth and user scoping | **Implemented; SQLite migration matches current SQLAlchemy metadata and startup migration is tested. PostgreSQL runtime not verified here.** |
 | Chat orchestration, skill registry (4 skills), schema-validated output | **Working** (tested with demo provider and mocked HTTP) |
 | Nebius and NVIDIA OpenAI-compatible gateway | **Gateway implemented; live calls unverified.** Choose task model IDs with `scripts/list_models.py`; needs a provider key |
@@ -26,7 +26,7 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 | Streaming chat and decision UI | **Implemented**: authenticated WebSocket event stream (POST `/api/chat` remains available), memory chips, action approval cards, answer rationale, and per-user debug turns. Live provider streaming not verified. |
 | Workspace policy, read-only inspection, proposal and approval flow | **Working**, unit and API tested |
 | Secret redaction, consent before external send | **Working**, best-effort redaction |
-| All 8 main screens | **Build, typecheck, and 15 frontend tests pass.** Not yet reviewed in a real browser. |
+| All 8 main screens | **Build, typecheck, and 15 frontend tests pass.** All eight route URLs returned the app shell over HTTP; screen rendering and interaction have not yet been reviewed in a real browser. |
 | 3D scene and camera panel | **Implemented** with an architecture scene and transparent cursor overlay. WebGL and camera behavior are not manually verified. |
 | MediaPipe hand gestures (point, pinch, open hand, swipe) | **Classifier and coordinate mapping are unit tested with recorded landmarks.** Camera fallback below 20 FPS is implemented; real-device frame rate and gesture behavior are unverified. |
 | Alembic migrations | **Current SQLite schema matches model metadata;** startup upgrades pending revisions and fails clearly if migration fails. PostgreSQL runtime not verified here. |
