@@ -3,7 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ORBIT</title>
+    <meta name="theme-color" content="#06121a" />
+    <script>
+      // Apply the saved or system theme before first paint, so the page never flashes the wrong theme.
+      try {
+        var saved = localStorage.getItem("orbit.theme");
+        var theme = saved === "light" || saved === "dark" ? saved : (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = theme;
+      } catch (e) { document.documentElement.dataset.theme = "dark"; }
+    </script>
+    <meta name="description" content="ORBIT: explore how any software system works as an interactive 3D architecture." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>ORBIT · Explore how systems work</title>
   </head>
   <body>
     <div id="root"></div>

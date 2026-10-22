@@ -3,6 +3,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
 
+from app.services.scene_generator import GeneratedScene
+
 
 def _utc(d: datetime) -> str:
     return (d.replace(tzinfo=timezone.utc) if d.tzinfo is None else d).isoformat()
@@ -27,6 +29,17 @@ class MemoryIn(BaseModel):
 class VisionContextIn(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
     project_name: str = Field(min_length=1, max_length=120)
+
+
+class SceneRequest(BaseModel):
+    topic: str = Field(min_length=2, max_length=120)
+
+
+class SceneResponse(BaseModel):
+    scene: GeneratedScene
+    provider: str
+    model: str
+    cached: bool
 
 
 class ProjectIn(BaseModel):

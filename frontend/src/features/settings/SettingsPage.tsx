@@ -22,8 +22,9 @@ export function SettingsPage() {
   const p = info.data?.provider;
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div>
       <PageHeader title="Settings and Privacy" description="See what ORBIT can access, what leaves your computer, and how to remove what it stores." />
+      <div className="grid items-start gap-5 xl:grid-cols-2">
       <Panel title="Model provider and backend">
         {health.error ? <ErrorState error={health.error} retry={() => health.refetch()} /> : !health.data || !p ? <Skeleton className="h-12" /> : (
           <dl className="grid grid-cols-[9rem_1fr] gap-y-2 text-sm">
@@ -40,22 +41,23 @@ export function SettingsPage() {
       <Panel title="Authorized workspaces">
         {ws.data?.length ? <ul className="space-y-1 text-sm">{ws.data.map((w) => <li key={w.id} className="flex items-center gap-2"><span className="font-medium">{w.name}</span><Badge color={w.allow_write ? "warn" : "ok"}>{w.allow_write ? "Read and write" : "Read only"}</Badge><span className="truncate font-mono text-xs text-muted">{w.path}</span></li>)}</ul> : <p className="text-sm text-muted">None. Manage workspaces in Projects.</p>}
       </Panel>
-      <Panel title="Tool permissions">
+      <Panel title="Camera">
+        <p className="text-sm">Browser permission: <Badge color={cam === "granted" ? "warn" : "neutral"}>{cam}</Badge></p>
+        <p className="mt-2 text-sm text-muted">The camera only starts when you press Start in Visual Learning Studio, and an indicator shows while it is on. Video is not recorded or uploaded. Change the permission in your browser's site settings.</p>
+      </Panel>
+      <Panel title="Tool permissions" className="xl:col-span-2">
         <p className="mb-3 text-sm text-muted">Tools are checked by the backend on every call. The model cannot run shell commands or reach files outside an authorized workspace.</p>
         <table className="w-full text-left text-sm"><thead className="text-xs text-muted"><tr><th className="pb-1 font-medium">Tool</th><th className="pb-1 font-medium">Needs</th><th className="pb-1 font-medium">Confirmation</th></tr></thead>
           <tbody>{info.data?.tools.map((t) => <tr key={t.name} className="border-t border-line"><td className="py-1.5"><span className="font-mono text-xs">{t.name}</span><span className="block text-xs text-muted">{t.description}</span></td><td>{t.permissions.map((x) => <Badge key={x}>{x}</Badge>)}</td><td>{t.requires_confirmation ? "Required each time" : "Not needed"}</td></tr>)}</tbody></table>
         <div className="mt-3 space-y-2">{toolPermissions.data?.map((tool) => <label key={tool.tool_name} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={tool.trusted_for_session} onChange={(e) => api.setToolTrust(tool.tool_name, e.target.checked).then(() => qc.invalidateQueries({ queryKey: ["tool-permissions"] }))} /> Allow {tool.tool_name} without asking again (stored until turned off)</label>)}</div>
       </Panel>
-      <Panel title="Recent debug turns">
+      <Panel title="Recent debug turns" className="xl:col-span-2">
         {debug.isLoading ? <Skeleton className="h-12" /> : !debug.data?.length ? <p className="text-sm text-muted">No recent turns.</p> : <div className="space-y-2">{[...debug.data].reverse().slice(0, 10).map((turn, i) => <details key={i} className="rounded border border-line p-2 text-xs"><summary className="cursor-pointer">{String(turn.intent)} · {String(turn.provider)} / {String(turn.model)} · {String(turn.total_latency_ms)} ms</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{JSON.stringify(turn, null, 2)}</pre></details>)}</div>}
-      </Panel>
-      <Panel title="Camera">
-        <p className="text-sm">Browser permission: <Badge color={cam === "granted" ? "warn" : "neutral"}>{cam}</Badge></p>
-        <p className="mt-2 text-sm text-muted">The camera only starts when you press Start in Visual Learning Studio, and an indicator shows while it is on. Video is not recorded or uploaded. Change the permission in your browser's site settings.</p>
       </Panel>
       <Panel title="Delete stored data">
         <div className="flex flex-wrap gap-2"><Button variant="danger" onClick={() => setDanger("history")}>Delete all conversation history</Button><Button variant="danger" onClick={() => setDanger("memory")}>Delete all memories</Button></div>
       </Panel>
+      </div>
       <ConfirmDialog open={!!danger} danger title={danger === "history" ? "Delete all conversations?" : "Delete all memories?"} body="This can't be undone." confirmLabel="Delete" onCancel={() => setDanger(null)} onConfirm={() => wipe.mutate()} />
     </div>
   );

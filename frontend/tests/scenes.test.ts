@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ecommerceScene, subjects, threeTierScene, createTopicScene, stepsOf } from "../src/vision/scenes";
+import { componentKinds, ecommerceScene, kindLabels, kindOf, llmPlatformScene, matchCuratedSubject, subjects, threeTierScene, createTopicScene, stepsOf } from "../src/vision/scenes";
 
 function validateScene(scene: typeof threeTierScene) {
   const ids = new Set(scene.components.map((c) => c.id));
@@ -15,6 +15,8 @@ function validateScene(scene: typeof threeTierScene) {
     expect(c.position).toHaveLength(3);
     expect(c.size).toHaveLength(3);
     expect(c.step).toBeGreaterThan(0);
+    // Every component resolves to a known 3D model archetype.
+    expect(componentKinds).toContain(kindOf(c));
     // All connectsTo targets must exist
     for (const t of c.connectsTo) {
       expect(ids.has(t)).toBe(true);
@@ -94,5 +96,53 @@ describe("createTopicScene", () => {
     const scene = createTopicScene("restaurant");
     validateScene(scene);
     expect(scene.components.length).toBeGreaterThan(0);
+  });
+});
+
+describe("component kinds", () => {
+  it("has a display label for every kind", () => {
+    for (const kind of componentKinds) expect(kindLabels[kind]).toBeTruthy();
+  });
+
+  it("falls back to a kind derived from the shape", () => {
+    const base = threeTierScene.components[0];
+    expect(kindOf({ ...base, kind: undefined, shape: "cylinder" })).toBe("database");
+    expect(kindOf({ ...base, kind: undefined, shape: "sphere" })).toBe("user");
+    expect(kindOf({ ...base, kind: undefined, shape: "box" })).toBe("service");
+    expect(kindOf({ ...base, kind: "cache" })).toBe("cache");
+  });
+});
+
+describe("LLM platform scene", () => {
+  it("has valid component data", () => validateScene(llmPlatformScene));
+
+  it("covers the full serving, retrieval and ingestion paths", () => {
+    expect(llmPlatformScene.components.length).toBeGreaterThanOrEqual(20);
+    const ids = new Set(llmPlatformScene.components.map((c) => c.id));
+    for (const id of ["api-gateway", "rate-limiter", "orchestrator", "embedder", "vector-db", "router", "gpu-a", "kv-cache", "ingest-queue"]) expect(ids.has(id)).toBe(true);
+    expect(llmPlatformScene.components.filter((c) => c.zone === "gpu").length).toBeGreaterThanOrEqual(3);
+    expect(llmPlatformScene.overview?.requestFlow.length).toBeGreaterThan(0);
+  });
+
+  it("keeps pedestals from overlapping", () => {
+    const parts = llmPlatformScene.components;
+    for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) {
+      const d = Math.hypot(parts[i].position[0] - parts[j].position[0], parts[i].position[2] - parts[j].position[2]);
+      expect(d).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
+describe("matchCuratedSubject", () => {
+  it("routes known topics to full hand-built scenes", () => {
+    expect(matchCuratedSubject("LLM serving platform with retrieval (a ChatGPT-style system)")).toBe(llmPlatformScene.id);
+    expect(matchCuratedSubject("how does ChatGPT work")).toBe(llmPlatformScene.id);
+    expect(matchCuratedSubject("RAG pipeline")).toBe(llmPlatformScene.id);
+    expect(matchCuratedSubject("Amazon")).toBe(ecommerceScene.id);
+  });
+
+  it("does not match words that merely contain a keyword", () => {
+    expect(matchCuratedSubject("cloud storage")).toBeNull();
+    expect(matchCuratedSubject("banking system")).toBeNull();
   });
 });

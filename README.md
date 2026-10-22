@@ -60,7 +60,7 @@ Authorize a folder, browse its filtered file tree, search, preview files, and re
 
 ### Visual Learning Studio
 
-Explore curated, hand-built 3D architecture scenes. Mouse controls work without a camera. Optional browser hand tracking recognizes point, pinch-to-grab (rotate the scene), open hand, and swipe gestures; remembering a selected component posts a `VISION` memory linked to a project name. Camera frames are processed locally and are not uploaded. The hand-tracking runtime and model are downloaded from external hosts when enabled.
+Explore curated, hand-built 3D architecture scenes. Mouse controls work without a camera. Optional browser hand tracking (the **Hand control** button on the scene) draws a hand cursor over the 3D view: point and hold to select the part under it, pinch and drag to rotate, pinch quickly to select, swipe left or right to step through parts or the tour, hold an open palm to reset the view, and hold a thumbs up to remember the selected part as a `VISION` memory linked to a project name. Camera frames are processed locally and are not uploaded. The hand-tracking runtime and model are downloaded from external hosts when enabled.
 
 The studio includes a curated **Amazon-like e-commerce system-design** scene with 11 components (CDN, API Gateway, Product Catalog, Cart, Order, Payment, Inventory, Database, Cache, Message Queue). Selecting a component shows its APIs, data model, scaling strategy, failure modes, and design trade-offs. A collapsible system-design overview panel covers requirements, assumptions, high-level architecture, and the request flow. Ask in chat with "Explain the system design of Amazon" to get a structured interview-style breakdown from the AI.
 
