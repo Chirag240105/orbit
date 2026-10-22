@@ -1,5 +1,5 @@
 from app.skills.base import Skill
-from app.skills.builtin import ExplainCode, GeneralQA, SummarizeText, TaskPlan
+from app.skills.builtin import ExplainCode, GeneralQA, SummarizeText, SystemDesign, TaskPlan
 
 
 class SkillRegistry:
@@ -20,6 +20,6 @@ class SkillRegistry:
 
 def default_registry() -> SkillRegistry:
     reg = SkillRegistry()
-    for s in (GeneralQA(), SummarizeText(), ExplainCode(), TaskPlan()):
+    for s in (GeneralQA(), SummarizeText(), ExplainCode(), TaskPlan(), SystemDesign()):
         reg.register(s)
     return reg

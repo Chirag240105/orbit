@@ -1,35 +1,42 @@
-"""List models your Nebius Token Factory key can use.
-Run from the repo root:  python scripts\\list_models.py"""
-import json
-import os
-import pathlib
-import urllib.error
-import urllib.request
+"""List models exposed by the provider selected with LLM_PROVIDER.
 
-env = pathlib.Path(__file__).resolve().parent.parent / ".env"
-if not env.exists():
-    env = pathlib.Path(__file__).resolve().parent.parent / "backend" / ".env"
-vals = {}
-if env.exists():
-    for line in env.read_text(encoding="utf-8-sig").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, v = line.split("=", 1)
-            vals[k.strip()] = v.strip().strip('"').strip("'")
-# .env wins over any stale shell variable
-key = vals.get("NEBIUS_API_KEY") or os.environ.get("NEBIUS_API_KEY", "")
-base = (vals.get("NEBIUS_BASE_URL") or os.environ.get("NEBIUS_BASE_URL")
-        or "https://api.tokenfactory.nebius.com/v1/").rstrip("/")
-print(f".env used: {env if env.exists() else 'none'} | key set: {bool(key)} | length: {len(key)} | base: {base}")
-if os.environ.get("NEBIUS_API_KEY") and os.environ["NEBIUS_API_KEY"] != key:
-    print("WARNING: your shell has a different NEBIUS_API_KEY than .env (using .env).")
-if not key:
-    raise SystemExit("NEBIUS_API_KEY missing in .env")
-req = urllib.request.Request(f"{base}/models", headers={"Authorization": f"Bearer {key}", "User-Agent": "orbit-list-models/0.1"})
-try:
-    with urllib.request.urlopen(req, timeout=30) as r:
-        data = json.load(r)
-except urllib.error.HTTPError as e:
-    raise SystemExit(f"HTTP {e.code}. 401/403 means the provider rejected this key.")
-ids = sorted(m["id"] for m in data.get("data", []))
-print("\n".join(i for i in ids if "nemotron" in i.lower()) or "No Nemotron models listed. All models:\n" + "\n".join(ids))
+Run from the repository root: python scripts/list_models.py
+"""
+
+import asyncio
+import pathlib
+import sys
+
+import httpx
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "backend"))
+
+from app.config import Settings  # noqa: E402 -- backend path is added above
+
+
+async def main() -> int:
+    settings = Settings()
+    provider = settings.llm_provider
+    if provider == "demo":
+        print("LLM_PROVIDER=demo has no remote model catalogue.")
+        return 0
+    key = settings.nebius_api_key if provider == "nebius" else settings.nvidia_api_key
+    base = settings.nebius_base_url if provider == "nebius" else settings.nvidia_base_url
+    if not key:
+        key_name = "NEBIUS_API_KEY" if provider == "nebius" else "NVIDIA_API_KEY"
+        raise SystemExit(f"{key_name} is not configured.")
+    print(f"Provider: {provider} | endpoint: {base}")
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(f"{base}/models", headers={"Authorization": f"Bearer {key}"})
+        response.raise_for_status()
+        models = sorted(item["id"] for item in response.json().get("data", []) if item.get("id"))
+    except (httpx.HTTPError, ValueError) as exc:
+        raise SystemExit(f"Could not list models ({type(exc).__name__}). Check the provider, endpoint, and key.") from None
+    print("\n".join(models) if models else "The provider returned no model IDs.")
+    print("\nSet MODEL_PLANNER and MODEL_FAST to IDs above; set MODEL_EMBED to an embedding model ID if available.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(asyncio.run(main()))

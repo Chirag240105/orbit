@@ -1,6 +1,8 @@
 def test_health(client):
     j = client.get("/api/health").json()
     assert j["status"] == "ok" and j["provider"]["configured"] is False
+    assert j["provider"]["name"] == "nebius"
+    assert j["provider"]["reachability"]["reachable"] is False
 
 
 def test_chat_unconfigured_is_explicit(client):
@@ -34,6 +36,17 @@ def test_memory_crud_and_retrieval(demo):
     assert demo.get("/api/memories").json() == []
 
 
+def test_memory_deduplicates_same_type_and_updates_user_entry(demo):
+    async def similar_embedding(_texts):
+        return [[1.0, 0.0]]
+    demo.app.state.model_gateway.embed = similar_embedding
+    first = demo.post("/api/memories", json={"content": "I use PostgreSQL for ORBIT", "type": "PROJECT"}).json()
+    second = demo.post("/api/memories", json={"content": "ORBIT uses PostgreSQL", "type": "PROJECT"}).json()
+    assert second["id"] == first["id"]
+    assert second["content"] == "ORBIT uses PostgreSQL"
+    assert len(demo.get("/api/memories").json()) == 1
+
+
 def test_unconfirmed_suggestion_not_retrieved(demo):
     demo.post("/api/memories", json={"content": "likes pineapple pizza", "source": "chat_suggestion"})
     assert demo.post("/api/chat", json={"message": "pineapple pizza?"}).json()["context"]["memory_ids"] == []
@@ -51,6 +64,48 @@ def test_tasks_flow(client):
     assert client.delete(f"/api/tasks/{t['id']}").status_code == 204
 
 
+def test_projects_and_notes_crud(client):
+    project = client.post("/api/projects", json={"name": "ORBIT", "description": "Personal AI"})
+    assert project.status_code == 201
+    project = project.json()
+    note = client.post("/api/notes", json={
+        "title": "Decision", "content": "Use PostgreSQL", "project_id": project["id"],
+    })
+    assert note.status_code == 201
+    note = note.json()
+    assert client.get("/api/projects").json()[0]["id"] == project["id"]
+    assert client.get("/api/notes", params={"project_id": project["id"]}).json()[0]["id"] == note["id"]
+    assert client.patch(f"/api/projects/{project['id']}", json={"description": "Updated"}).json()["description"] == "Updated"
+    assert client.patch(f"/api/notes/{note['id']}", json={"content": "Revised"}).json()["content"] == "Revised"
+    assert client.delete(f"/api/projects/{project['id']}").status_code == 204
+    assert client.get("/api/notes").json()[0]["project_id"] is None
+    assert client.delete(f"/api/notes/{note['id']}").status_code == 204
+
+
+def test_project_and_note_require_owned_project(client):
+    response = client.post("/api/notes", json={"title": "Orphan", "project_id": 999})
+    assert response.status_code == 404
+
+
 def test_cors_rejects_unknown_origin(client):
     r = client.get("/api/health", headers={"Origin": "http://evil.example"})
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_allows_authorization_header_from_configured_origin(client):
+    r = client.options("/api/tasks", headers={
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization",
+    })
+    assert r.status_code == 200
+    assert "authorization" in r.headers["access-control-allow-headers"].lower()
+def test_explicit_vision_context_is_saved_as_project_linked_memory(demo):
+    result = demo.post("/api/vision/context", json={
+        "content": "The API gateway receives frontend requests.",
+        "project_name": "Cloud app architecture",
+    })
+    assert result.status_code == 201
+    memory = result.json()
+    assert memory["type"] == "VISION" and memory["confirmed"] is True
+    assert memory["project_id"] is not None

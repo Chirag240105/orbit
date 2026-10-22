@@ -7,7 +7,10 @@ from app.main import create_app
 
 def make_client(**kw) -> TestClient:
     settings = Settings(database_url="sqlite://", _env_file=None, **kw)
-    return TestClient(create_app(settings), raise_server_exceptions=False)
+    client = TestClient(create_app(settings), raise_server_exceptions=False)
+    result = client.post("/api/auth/register", json={"email": "test@example.com", "password": "test-password-123"})
+    client.headers["Authorization"] = f"Bearer {result.json()['access_token']}"
+    return client
 
 
 @pytest.fixture

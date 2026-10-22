@@ -1,6 +1,7 @@
 from app.config import Settings
 from app.core.errors import AppError
 from app.providers.base import ChatProvider, ProviderResult
+from app.services.model_gateway import ModelGateway
 
 
 class DemoProvider(ChatProvider):
@@ -13,20 +14,24 @@ class DemoProvider(ChatProvider):
 
 
 class UnconfiguredProvider(ChatProvider):
-    name, model, configured = "none", "", False
+    configured = False
+
+    def __init__(self, provider: str, model: str):
+        self.name, self.model = provider, model
 
     async def complete(self, messages: list[dict]) -> ProviderResult:
         raise AppError(
             "provider_not_configured",
-            "No model provider is configured. Set NEBIUS_API_KEY in .env (or ORBIT_DEMO_MODE=true for a labeled demo).",
+            "No model provider is configured. Set the selected provider API key (or LLM_PROVIDER=demo for a labeled demo).",
             503,
         )
 
 
-def build_provider(settings: Settings) -> ChatProvider:
-    if settings.demo_mode:
+def build_provider(settings: Settings, gateway: ModelGateway | None = None) -> ChatProvider:
+    if settings.demo_mode or settings.mock_ai or settings.llm_provider == "demo":
         return DemoProvider()
-    if settings.nebius_api_key:
-        from app.providers.nebius import NebiusProvider
-        return NebiusProvider(settings)
-    return UnconfiguredProvider()
+    gateway = gateway or ModelGateway(settings)
+    if gateway.configured:
+        from app.providers.nebius import HostedProvider
+        return HostedProvider(settings, gateway)
+    return UnconfiguredProvider(settings.llm_provider, settings.model_planner or "")

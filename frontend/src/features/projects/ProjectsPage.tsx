@@ -5,7 +5,7 @@ import { useActiveWorkspace } from "../../app/WorkspaceContext";
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, Field, PageHeader, Panel, Skeleton, inputCls } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { kb } from "../../lib/format";
-import type { Change, Workspace } from "../../types/api";
+import type { Change, CodeExplainResult, Workspace } from "../../types/api";
 
 function Changes({ ws }: { ws: Workspace }) {
   const qc = useQueryClient();
@@ -43,17 +43,26 @@ function Workbench({ ws }: { ws: Workspace }) {
   const [term, setTerm] = useState("");
   const [draft, setDraft] = useState<{ content: string; note: string } | null>(null);
   const [writeConfirm, setWriteConfirm] = useState(false);
+  const [codeResult, setCodeResult] = useState<CodeExplainResult | null>(null);
+  const [codeConsent, setCodeConsent] = useState<{ body: { mode: "file" | "project" | "flow"; workspace_id: number; path?: string }; details?: { files?: string[]; chars?: number; redactions?: number; model?: string } } | null>(null);
   const tree = useQuery({ queryKey: ["tree", ws.id], queryFn: () => api.tree(ws.id) });
   const summary = useQuery({ queryKey: ["summary", ws.id], queryFn: () => api.summary(ws.id) });
   const hits = useQuery({ queryKey: ["search", ws.id, term], queryFn: () => api.search(ws.id, term), enabled: !!term });
   const content = useQuery({ queryKey: ["file", ws.id, file], queryFn: () => api.readFile(ws.id, file!), enabled: !!file });
   const propose = useMutation({ mutationFn: () => api.propose(ws.id, { path: file!, new_content: draft!.content, description: draft!.note }), onSuccess: () => { setDraft(null); qc.invalidateQueries({ queryKey: ["changes"] }); } });
   const setWrite = useMutation({ mutationFn: (v: boolean) => api.setWrite(ws.id, v), onSuccess: () => { setWriteConfirm(false); qc.invalidateQueries({ queryKey: ["workspaces"] }); } });
+  const explain = useMutation({
+    mutationFn: (body: { mode: "file" | "project" | "flow"; workspace_id: number; path?: string; consent_external?: boolean }) => api.explainCode(body),
+    onSuccess: (result) => { setCodeResult(result); setCodeConsent(null); if (result.stored_memory_id) qc.invalidateQueries({ queryKey: ["memories"] }); },
+    onError: (error, body) => {
+      if (error instanceof ApiError && error.code === "consent_required") setCodeConsent({ body, details: error.details as { files?: string[]; chars?: number; redactions?: number; model?: string } });
+    },
+  });
   const s = summary.data;
 
   return (
     <div className="space-y-4">
-      <Panel title="Project overview" action={<Button variant={ws.allow_write ? "danger" : "secondary"} onClick={() => (ws.allow_write ? setWrite.mutate(false) : setWriteConfirm(true))}>{ws.allow_write ? "Turn off write access" : "Allow writes"}</Button>}>
+      <Panel title="Project overview" action={<div className="flex gap-2"><Button onClick={() => explain.mutate({ mode: "project", workspace_id: ws.id })}>Explain project</Button><Button onClick={() => explain.mutate({ mode: "flow", workspace_id: ws.id })}>Trace flow</Button><Button variant={ws.allow_write ? "danger" : "secondary"} onClick={() => (ws.allow_write ? setWrite.mutate(false) : setWriteConfirm(true))}>{ws.allow_write ? "Turn off write access" : "Allow writes"}</Button></div>}>
         {summary.isLoading ? <Skeleton className="h-10" /> : s ? (
           <div className="text-sm"><p><b>{s.file_count}</b> supported files. {Object.entries(s.by_extension).slice(0, 6).map(([e, n]) => `${e} ${n}`).join(", ")}</p>
             {s.config_files.length > 0 && <p className="mt-1 text-muted">Config files found: {s.config_files.join(", ")}</p>}
@@ -61,6 +70,8 @@ function Workbench({ ws }: { ws: Workspace }) {
             <p className="mt-2 text-xs text-muted">{s.note}</p></div>
         ) : null}
       </Panel>
+      {codeResult && <Panel title={"Code explanation · " + codeResult.mode}><p className="whitespace-pre-wrap text-sm">{codeResult.summary}</p><ul className="mt-2 space-y-1 text-sm">{codeResult.files.map((f) => <li key={f.path}><b>{f.path}</b>: {f.summary}</li>)}</ul>{codeResult.flow_steps.length > 0 && <ol className="mt-2 list-decimal pl-5 text-sm">{codeResult.flow_steps.map((step, i) => <li key={i}>{step}</li>)}</ol>}{codeResult.risks.length > 0 && <p className="mt-2 text-sm text-warn">Risks: {codeResult.risks.join("; ")}</p>}<p className="mt-2 text-xs text-muted">{codeResult.external ? "Sent to the hosted model after redaction and your confirmation." : "Demo placeholder output."} {codeResult.redactions} likely secret(s) redacted.{codeResult.stored_memory_id ? " A project summary was suggested for Memory confirmation." : ""}</p></Panel>}
+      {explain.error && explain.error instanceof ApiError && explain.error.code !== "consent_required" && <ErrorState error={explain.error} />}
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
         <Panel title="Files">
           <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); setTerm(query.trim()); }}>
@@ -77,7 +88,7 @@ function Workbench({ ws }: { ws: Workspace }) {
             </ul>
           )}
         </Panel>
-        <Panel title={file ?? "File preview"} action={file && <div className="flex gap-2"><Button onClick={() => nav("/chat", { state: { file, prompt: `Explain ${file}` } })}>Explain with ORBIT</Button><Button disabled={!content.data} onClick={() => setDraft({ content: content.data!.content, note: "" })}>Propose a change</Button></div>}>
+        <Panel title={file ?? "File preview"} action={file && <div className="flex gap-2"><Button onClick={() => explain.mutate({ mode: "file", workspace_id: ws.id, path: file })}>Explain file</Button><Button onClick={() => explain.mutate({ mode: "flow", workspace_id: ws.id, path: file })}>Trace flow</Button><Button onClick={() => nav("/chat", { state: { file, prompt: `Explain ${file}` } })}>Ask in chat</Button><Button disabled={!content.data} onClick={() => setDraft({ content: content.data!.content, note: "" })}>Propose a change</Button></div>}>
           {!file ? <p className="text-sm text-muted">Select a file to preview it. Files like .env and private keys are never listed or readable.</p> : content.isLoading ? <Skeleton className="h-32" /> : content.error ? <ErrorState error={content.error} /> : draft ? (
             <div className="space-y-3">
               <Field label="New content"><textarea className={`${inputCls} font-mono`} rows={14} value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })} /></Field>
@@ -90,6 +101,7 @@ function Workbench({ ws }: { ws: Workspace }) {
         </Panel>
       </div>
       <Panel title="Proposed changes"><Changes ws={ws} /></Panel>
+      <ConfirmDialog open={!!codeConsent} title="Send redacted code to the hosted model?" confirmLabel="Explain code" body={codeConsent && <>These excerpts leave your computer for <b>{codeConsent.details?.model}</b>: {codeConsent.details?.files?.join(", ")} ({codeConsent.details?.chars?.toLocaleString()} characters, {codeConsent.details?.redactions ?? 0} likely secret(s) redacted). Redaction is best effort.</>} onCancel={() => setCodeConsent(null)} onConfirm={() => { const body = codeConsent!.body; setCodeConsent(null); explain.mutate({ ...body, consent_external: true }); }} />
       <ConfirmDialog open={writeConfirm} title="Allow ORBIT to write files in this workspace?" confirmLabel="Allow writes" body="Writes still happen only when you approve a specific proposed change. You can turn this off at any time." onCancel={() => setWriteConfirm(false)} onConfirm={() => setWrite.mutate(true)} />
     </div>
   );

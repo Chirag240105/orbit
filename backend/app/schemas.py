@@ -15,13 +15,56 @@ class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-MemType = Literal["fact", "preference", "project", "other"]
+MemType = Literal["USER", "PROJECT", "TASK", "PREFERENCE", "DECISION", "EVENT", "CODE_CONTEXT", "VISION"]
 
 
 class MemoryIn(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
-    type: MemType = "fact"
+    type: MemType = "USER"
     source: Literal["user", "chat_suggestion"] = "user"
+
+
+class VisionContextIn(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+    project_name: str = Field(min_length=1, max_length=120)
+
+
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field("", max_length=4000)
+
+
+class ProjectPatch(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=120)
+    description: str | None = Field(None, max_length=4000)
+
+
+class ProjectOut(ORM):
+    id: int
+    name: str
+    description: str
+    created_at: UtcDt
+
+
+class NoteIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field("", max_length=20_000)
+    project_id: int | None = None
+
+
+class NotePatch(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=200)
+    content: str | None = Field(None, max_length=20_000)
+    project_id: int | None = None
+
+
+class NoteOut(ORM):
+    id: int
+    title: str
+    content: str
+    project_id: int | None
+    created_at: UtcDt
+    updated_at: UtcDt
 
 
 class MemoryPatch(BaseModel):
@@ -35,7 +78,10 @@ class MemoryOut(ORM):
     content: str
     type: str
     source: str
+    project_id: int | None = None
     confirmed: bool
+    importance: float
+    last_accessed: UtcDt
     created_at: UtcDt
     updated_at: UtcDt
 
@@ -83,6 +129,9 @@ class ChatResponse(BaseModel):
     context: ContextUsed
     proposed_tasks: list[ProposedTask] = []
     warnings: list[str] = []
+    intent: Literal["chat", "plan_day", "task_op", "memory_op", "code_q", "vision_ctx", "system_design"] = "chat"
+    tool_calls: list[dict[str, Any]] = []
+    pending_actions: list[dict[str, Any]] = []
 
 
 class ConversationOut(ORM):
@@ -113,6 +162,10 @@ class SkillOut(BaseModel):
 
 class SkillPatch(BaseModel):
     enabled: bool
+
+
+class ToolPermissionPatch(BaseModel):
+    trusted_for_session: bool
 
 
 class WorkspaceIn(BaseModel):

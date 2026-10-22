@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { api } from "../lib/api";
-import { Badge } from "../components/ui";
+import { api, readAuthToken, saveAuthToken } from "../lib/api";
+import { Badge, Button, ErrorState, inputCls } from "../components/ui";
 import { useActiveWorkspace } from "./WorkspaceContext";
 
 const NAV = [
@@ -20,9 +21,17 @@ function AgentStatus() {
 }
 
 export function Shell() {
+  const qc = useQueryClient();
+  const [authenticated, setAuthenticated] = useState(() => !!readAuthToken());
   const { activeId, setActiveId } = useActiveWorkspace();
   const { data: workspaces } = useQuery({ queryKey: ["workspaces"], queryFn: api.workspaces });
   const active = workspaces?.find((w) => w.id === activeId);
+  useEffect(() => {
+    const expired = () => { setAuthenticated(false); qc.clear(); };
+    window.addEventListener("orbit:auth-expired", expired);
+    return () => window.removeEventListener("orbit:auth-expired", expired);
+  }, [qc]);
+  if (!authenticated) return <AuthScreen onAuthenticated={() => { setAuthenticated(true); qc.invalidateQueries(); }} />;
   return (
     <div className="flex h-full flex-col md:flex-row">
       <nav aria-label="Primary" className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface p-2 md:w-56 md:flex-col md:border-b-0 md:border-r md:p-3">
@@ -47,9 +56,40 @@ export function Shell() {
             {active && <Badge color={active.allow_write ? "warn" : "ok"}>{active.allow_write ? "Read and write" : "Read only"}</Badge>}
           </div>
           <AgentStatus />
+          <Button variant="ghost" onClick={() => { saveAuthToken(null); setAuthenticated(false); qc.clear(); }}>Sign out</Button>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto p-5"><Outlet /></main>
       </div>
     </div>
+  );
+}
+
+function AuthScreen({ onAuthenticated }: { onAuthenticated: () => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(null);
+    try {
+      const result = await api.authenticate(mode, email, password);
+      saveAuthToken(result.access_token); onAuthenticated();
+    } catch (e) { setError(e); } finally { setBusy(false); }
+  };
+  return (
+    <main className="grid min-h-full place-items-center p-5">
+      <section className="w-full max-w-sm rounded-xl border border-line bg-surface p-6">
+        <h1 className="text-2xl font-semibold">ORBIT</h1>
+        <p className="mt-1 text-sm text-muted">Sign in to access your personal workspace.</p>
+        {Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}
+        <form onSubmit={submit} className="mt-5 space-y-3">
+          <label className="block text-sm">Email<input required type="email" autoComplete="email" className={`${inputCls} mt-1`} value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+          <label className="block text-sm">Password<input required minLength={8} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} className={`${inputCls} mt-1`} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+          <Button type="submit" variant="primary" className="w-full" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</Button>
+        </form>
+        <button className="mt-4 text-sm text-accent underline" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}>{mode === "login" ? "Create an account" : "I already have an account"}</button>
+      </section>
+    </main>
   );
 }

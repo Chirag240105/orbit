@@ -2,7 +2,7 @@
 
 | Boundary | Trust | Main threats | Mitigations (status) |
 |---|---|---|---|
-| Frontend ↔ backend | Local, single user | Other sites calling the API; unauthenticated local processes | CORS allowlist, no wildcard, no credentials (**implemented**); binds `127.0.0.1` (**documented default**); local session token (**planned, SEC-01**) |
+| Frontend ↔ backend | Browser session, multiple accounts | Other sites calling the API; unauthorized account access | CORS allowlist, no wildcard, no credentials; bcrypt password hash; JWT bearer token; user-scoped ORM queries (**implemented**). Deployment must set a persistent `ORBIT_JWT_SECRET`. |
 | Backend ↔ model provider | Hosted, untrusted | Data exposure; key leak; hostile output | Key only in backend env; HTTPS-only URL validation; consent before file text is sent; redaction; output validated against schema; provider errors made generic (**implemented, tested with mocks**). Live provider call **not yet verified (AI-01)** |
 | Model output | Untrusted | Prompt injection causing actions; malicious commands in text | No shell/subprocess anywhere; model cannot call tools in MVP; output is only rendered as text/JSON (**implemented**) |
 | Retrieved files / memories | Untrusted data | Injected instructions ("ignore previous rules…") | Fenced in `<untrusted_data>`, closing tag neutralized, system preamble says data ≠ instructions (**implemented; effectiveness against a real model untested, SEC-05**) |

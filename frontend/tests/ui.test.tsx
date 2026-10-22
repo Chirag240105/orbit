@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Button, EmptyState, ErrorState } from "../src/components/ui";
-import { ApiError, request } from "../src/lib/api";
+import { ApiError, request, saveAuthToken } from "../src/lib/api";
 import { kb, timeAgo } from "../src/lib/format";
-import { stepsOf, subjects, threeTierScene } from "../src/features/visual-learning/scenes";
+import { stepsOf, subjects, threeTierScene } from "../src/vision/scenes";
 
 describe("ui primitives", () => {
   it("Button fires onClick and respects disabled", () => {
@@ -25,6 +25,14 @@ describe("ui primitives", () => {
 
 describe("api client", () => {
   afterEach(() => vi.unstubAllGlobals());
+  it("sends the signed-in bearer token to the API", async () => {
+    saveAuthToken("test-jwt");
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+    vi.stubGlobal("fetch", fetcher);
+    await request("GET", "/tasks");
+    expect(fetcher.mock.calls[0][1].headers.Authorization).toBe("Bearer test-jwt");
+    saveAuthToken(null);
+  });
   it("maps backend error envelopes to ApiError", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409, json: async () => ({ error: { code: "consent_required", message: "Confirm", details: { chars: 5 } } }) }));
     await expect(request("POST", "/chat", {})).rejects.toMatchObject({ code: "consent_required", status: 409, details: { chars: 5 } });

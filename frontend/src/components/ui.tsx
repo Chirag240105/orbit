@@ -67,6 +67,19 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
 
 export const Skeleton = ({ className }: { className?: string }) => <div aria-hidden className={cx("animate-pulse rounded bg-raised", className ?? "h-4 w-full")} />;
 
+export function PageLoader() {
+  return (
+    <div className="flex h-full min-h-[20rem] items-center justify-center" aria-busy="true" role="status">
+      <div className="text-sm text-muted">Loading…</div>
+    </div>
+  );
+}
+
+/** Full-page loading skeleton for data-heavy pages. */
+export function ListSkeleton({ rows = 4 }: { rows?: number }) {
+  return <div className="space-y-2">{Array.from({ length: rows }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div>;
+}
+
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block text-sm">

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useActiveWorkspace } from "../../app/WorkspaceContext";
 import { ConfirmDialog, EmptyState, ErrorState, PageHeader, Button, inputCls } from "../../components/ui";
-import { ApiError, api } from "../../lib/api";
+import { ApiError, api, chatStream } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 import type { ChatRequest, Message } from "../../types/api";
 import { OutputView } from "./OutputView";
@@ -21,6 +21,8 @@ export function ChatPage() {
   const [file, setFile] = useState(nav?.file ?? "");
   const [consent, setConsent] = useState<Consent | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [streamChars, setStreamChars] = useState(0);
+  const [streamEvents, setStreamEvents] = useState<string[]>([]);
   const end = useRef<HTMLDivElement>(null);
   const health = useQuery({ queryKey: ["health"], queryFn: api.health });
   const convs = useQuery({ queryKey: ["conversations"], queryFn: api.conversations });
@@ -29,13 +31,20 @@ export function ChatPage() {
 
   const open = async (id: number) => { setConvId(id); setError(null); setThread(await api.messages(id)); };
   const send = useMutation({
-    mutationFn: (req: ChatRequest) => api.chat(req),
-    onSuccess: async (r) => { setConvId(r.conversation_id); setThread(await api.messages(r.conversation_id)); qc.invalidateQueries({ queryKey: ["conversations"] }); },
+    mutationFn: (req: ChatRequest) => chatStream(req, (event, data) => {
+      if (event === "token") setStreamChars((n) => n + String(data.text ?? "").length);
+      const memoryIds = data.memory_ids;
+      if (event === "memory_recalled" && Array.isArray(memoryIds)) setStreamEvents((e) => [...e, `${memoryIds.length} memories recalled`]);
+      if (event === "tool_call") setStreamEvents((e) => [...e, `Tool ${String(data.name)}: ${String(data.status)}`]);
+      if (event === "pending_action") setStreamEvents((e) => [...e, `Action ${String(data.tool_name)} awaits approval`]);
+    }),
+    onSuccess: async (r) => { setStreamChars(0); setStreamEvents([]); setConvId(r.conversation_id); setThread(await api.messages(r.conversation_id)); qc.invalidateQueries({ queryKey: ["conversations"] }); },
     onError: (e, req) => {
       if (e instanceof ApiError && e.code === "consent_required" && e.details) {
         const d = e.details as { files: string[]; chars: number; redactions: number; model: string };
         setConsent({ req, files: d.files, chars: d.chars, redactions: d.redactions, model: d.model });
       } else setError(e);
+      setStreamChars(0);
     },
   });
 
@@ -45,6 +54,7 @@ export function ChatPage() {
     if (!text.trim()) return;
     const req: ChatRequest = { message: text.trim(), conversation_id: convId, skill: skill || null, workspace_id: file.trim() ? activeId : null, file_paths: file.trim() ? [file.trim()] : [] };
     setError(null);
+    setStreamChars(0); setStreamEvents([]);
     setThread((t) => [...t, { id: -Date.now(), role: "user", content: req.message, skill: null, meta: null, created_at: new Date().toISOString() }]);
     setText("");
     send.mutate(req);
@@ -77,7 +87,7 @@ export function ChatPage() {
               {m.role === "user" ? String(m.content) : <OutputView msg={m} />}
             </div>
           ))}
-          {send.isPending && <p className="text-sm text-muted">ORBIT is working…</p>}
+          {send.isPending && <div role="status" className="text-sm text-muted">ORBIT is streaming{streamChars ? ` (${streamChars} characters received)` : "…"}{streamEvents.map((event, i) => <span key={`${event}-${i}`} className="ml-2 rounded bg-raised px-2 py-1">{event}</span>)}</div>}
           {error != null && <ErrorState error={error} />}
           <div ref={end} />
         </div>

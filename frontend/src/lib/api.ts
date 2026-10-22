@@ -6,14 +6,26 @@ export class ApiError extends Error {
   }
 }
 
+const TOKEN_KEY = "orbit.accessToken";
+export const readAuthToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
+export const saveAuthToken = (token: string | null) => { try { token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ } };
+
 export async function request<R>(method: string, path: string, body?: unknown): Promise<R> {
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
+    const token = readAuthToken();
+    const headers: Record<string, string> = {};
+    if (body) headers["Content-Type"] = "application/json";
+    if (token) headers.Authorization = `Bearer ${token}`;
+    res = await fetch(`/api${path}`, { method, headers: Object.keys(headers).length ? headers : undefined, body: body ? JSON.stringify(body) : undefined });
   } catch {
     throw new ApiError("backend_unreachable", "Can't reach the ORBIT backend. Start it with `uvicorn app.main:app_factory --factory` in /backend.", 0);
   }
   if (res.status === 204) return undefined as R;
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    saveAuthToken(null);
+    window.dispatchEvent(new Event("orbit:auth-expired"));
+  }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const e = data?.error;
@@ -22,12 +34,50 @@ export async function request<R>(method: string, path: string, body?: unknown): 
   return data as R;
 }
 
+export function chatStream(req: T.ChatRequest, onEvent?: (event: string, data: Record<string, unknown>) => void): Promise<T.ChatResponse> {
+  if (typeof WebSocket === "undefined") return api.chat(req);
+  return new Promise((resolve, reject) => {
+    const token = readAuthToken();
+    if (!token) return reject(new ApiError("authentication_required", "Sign in to chat with ORBIT.", 401));
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    let socket: WebSocket;
+    try { socket = new WebSocket(`${protocol}//${window.location.host}/ws/chat`); }
+    catch { api.chat(req).then(resolve, reject); return; }
+    let settled = false;
+    socket.onopen = () => socket.send(JSON.stringify({ token, request: req }));
+    socket.onmessage = (message) => {
+      let frame: { event: string; data: Record<string, unknown> };
+      try { frame = JSON.parse(message.data); } catch { return; }
+      onEvent?.(frame.event, frame.data ?? {});
+      if (frame.event === "auth_expired") { saveAuthToken(null); window.dispatchEvent(new Event("orbit:auth-expired")); }
+      if (frame.event === "done") { settled = true; resolve(frame.data as unknown as T.ChatResponse); socket.close(); }
+      if (frame.event === "error") {
+        settled = true;
+        const details = frame.data.details as Record<string, unknown> | null;
+        reject(new ApiError(String(frame.data.code ?? "unknown_error"), String(frame.data.message ?? "Chat failed."), frame.data.code === "consent_required" ? 409 : 500, details));
+        socket.close();
+      }
+    };
+    socket.onerror = () => { if (!settled) reject(new ApiError("backend_unreachable", "Can't reach the ORBIT chat stream.", 0)); };
+    socket.onclose = (event) => { if (!settled) reject(new ApiError("stream_closed", `Chat stream closed (${event.code}).`, event.code === 4401 ? 401 : 0)); };
+  });
+}
+
 const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
 
 export const api = {
   health: () => request<T.Health>("GET", "/health"),
   settings: () => request<T.SettingsInfo>("GET", "/settings"),
   chat: (b: T.ChatRequest) => request<T.ChatResponse>("POST", "/chat", b),
+  approveAction: (id: number) => request<{ id: number; status: string }>("POST", `/actions/${id}/approve`),
+  rejectAction: (id: number) => request<{ id: number; status: string }>("POST", `/actions/${id}/reject`),
+  debugTurns: () => request<Record<string, unknown>[]>("GET", "/debug/last-turns"),
+  toolPermissions: () => request<{ tool_name: string; trusted_for_session: boolean }[]>("GET", "/tool-permissions"),
+  setToolTrust: (name: string, trusted_for_session: boolean) => request<{ tool_name: string; trusted_for_session: boolean }>("PATCH", `/tool-permissions/${name}`, { trusted_for_session }),
+  generateSchedule: (body: { request: string; date: string; timezone?: string }) => request<T.ScheduleDraft>("POST", "/schedule/generate", body),
+  schedule: (day: string) => request<T.ScheduleBlock[]>("GET", `/schedule?date=${encodeURIComponent(day)}`),
+  explainCode: (body: { mode: "selection" | "file" | "project" | "flow"; workspace_id?: number; path?: string; selection?: string; consent_external?: boolean }) => request<T.CodeExplainResult>("POST", "/code/explain", body),
+  saveVisionContext: (body: { content: string; project_name: string }) => request<T.Memory>("POST", "/vision/context", body),
   conversations: () => request<T.Conversation[]>("GET", "/conversations"),
   messages: (id: number) => request<T.Message[]>("GET", `/conversations/${id}/messages`),
   deleteConversation: (id: number) => request<void>("DELETE", `/conversations/${id}`),
@@ -55,4 +105,5 @@ export const api = {
   addTask: (b: Partial<T.Task> & { title: string }) => request<T.Task>("POST", "/tasks", b),
   patchTask: (id: number, b: Partial<T.Task>) => request<T.Task>("PATCH", `/tasks/${id}`, b),
   deleteTask: (id: number) => request<void>("DELETE", `/tasks/${id}`),
+  authenticate: (mode: "login" | "register", email: string, password: string) => request<{ access_token: string; token_type: string }>("POST", `/auth/${mode}`, { email, password }),
 };

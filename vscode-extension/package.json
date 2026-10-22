@@ -1,0 +1,41 @@
+{
+  "name": "orbit-personal-ai",
+  "displayName": "ORBIT Personal AI",
+  "description": "Explain code through your authenticated ORBIT backend.",
+  "version": "0.1.0",
+  "publisher": "chirag240105",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/Chirag240105/orbit.git", "directory": "vscode-extension" },
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "files": ["out/**", "package.json", "README.md", "LICENSE*"],
+  "contributes": {
+    "commands": [
+      { "command": "orbit.linkWorkspace", "title": "ORBIT: Link Authorized Workspace" },
+      { "command": "orbit.explainSelection", "title": "ORBIT: Explain Selection" },
+      { "command": "orbit.explainFile", "title": "ORBIT: Explain File" },
+      { "command": "orbit.explainProject", "title": "ORBIT: Explain Project" },
+      { "command": "orbit.traceFlow", "title": "ORBIT: Trace Flow" },
+      { "command": "orbit.toggleSharing", "title": "ORBIT: Toggle Hosted Code Sharing" },
+      { "command": "orbit.setToken", "title": "ORBIT: Set API Token" }
+    ],
+    "configuration": {
+      "title": "ORBIT",
+      "properties": {
+        "orbit.apiBaseUrl": { "type": "string", "default": "http://127.0.0.1:8000", "description": "ORBIT backend URL" }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.5.0",
+    "@vscode/vsce": "^2.31.0"
+  }
+}

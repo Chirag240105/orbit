@@ -5,7 +5,7 @@ cd backend && pytest -q && ruff check app tests
 cd frontend && npm run typecheck && npm test && npm run build
 cd backend && pytest ../examples/example-skill -q
 ```
-Backend tests use an in-memory SQLite database, a mocked HTTP transport for the provider, and temp folders. No real credentials or personal files are used.
+Backend tests use an in-memory SQLite database, a mocked HTTP transport for the provider, and temp folders. No real credentials or personal files are used. Frontend tests include scene-data integrity tests for all curated scenes.
 
 ## Manual smoke checklist (run before a demo)
 - [ ] Backend starts; `/api/health` is `ok`; top bar shows the right provider state.
@@ -17,4 +17,7 @@ Backend tests use an in-memory SQLite database, a mocked HTTP transport for the 
 - [ ] Memory: add, edit, search, confirm a suggested one, delete one, delete all.
 - [ ] Tasks: plan in chat, send to Tasks, approve, move to done.
 - [ ] Visual Learning: scene loads, rotate/zoom/pan, select, isolate, reset, step mode; camera start shows indicator, stop turns it off; denying permission shows a clear message.
+- [ ] Visual Learning — Amazon e-commerce scene: switch to the Amazon-like tab, open the system-design overview, select a component, verify structured content (APIs, data model, scaling, failure modes) appears.
+- [ ] Visual Learning — pinch-to-grab: start camera, pinch and move your hand to rotate the scene; release to stop rotating.
+- [ ] System-design chat: ask "Explain the system design of Amazon" — the system_design skill is selected and returns a structured answer with key points, risks, and follow-ups.
 - [ ] Kill the backend: pages show "Backend not reachable".
