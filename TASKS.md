@@ -4,6 +4,18 @@ Task board for **Chirag** and **Charanjeet**. All statuses start at **Not Starte
 
 Owners come from the assignment in the project brief (Chirag: agent, backend, integrations, security; Charanjeet: frontend and UX). Nothing here assumes anyone's skill level or any work that hasn't been confirmed.
 
+## Recent improvements (refinement pass)
+
+The following improvements were made during a project-wide refinement pass:
+
+- **Performance — route-based code splitting:** All feature pages are lazy-loaded. Three.js and MediaPipe are split into separate chunks that load only when Visual Learning is opened. Initial bundle reduced from 1.3 MB to ~249 kB (78 kB gzip).
+- **MediaPipe FPS fix (root cause):** The 50 ms inference throttle was limiting tracking to exactly 20 FPS, then stopping when "below 20 FPS." Fixed: throttle reduced to 28 ms (~30 FPS target), stop threshold lowered to 8 FPS, warm-up increased to 5 s, and four consecutive low-FPS windows required before fallback. FPS display updates every 2 s to reduce React state churn.
+- **3D scene improvements:** Added hemisphere lighting, a second directional light, PBR materials (roughness/metalness), and pinch-to-grab camera rotation via continuous hand tracking. Hand tracking uses refs (not React state) to avoid re-renders during inference.
+- **Amazon-like e-commerce system-design scene:** 11 components (CDN, API Gateway, Catalog, Cart, Order, Payment, Inventory, Database, Cache, Queue) with structured learning content (APIs, data models, scaling, failure modes, trade-offs) and a system-design overview panel (requirements, assumptions, architecture, request flow).
+- **Backend system-design skill:** New `system_design` skill registered for interview-style architecture explanations. Intent routing added for system-design keywords. Demo output provided for no-provider mode.
+- **Design system:** Refined dark color palette, scrollbar styling, focus states, and shared UI tokens.
+- **Tests:** Added 9 frontend scene-data tests and 3 backend system-design skill/intent tests. All pass (91 backend, 24 frontend).
+
 ## What exists today (starting point)
 - **Backend (tested, 51 passing tests):** health, chat orchestration, provider interface with Nebius (mock-tested only), demo mode, skills registry with 4 skills, memory CRUD, workspace policy, proposal/approval flow, tasks, audit log, redaction.
 - **Frontend (typecheck, 10 tests, and build pass):** all eight screens, design primitives, typed API client, 3D scene, camera panel. Not yet reviewed in a real browser.

@@ -129,7 +129,7 @@ class ChatResponse(BaseModel):
     context: ContextUsed
     proposed_tasks: list[ProposedTask] = []
     warnings: list[str] = []
-    intent: Literal["chat", "plan_day", "task_op", "memory_op", "code_q", "vision_ctx"] = "chat"
+    intent: Literal["chat", "plan_day", "task_op", "memory_op", "code_q", "vision_ctx", "system_design"] = "chat"
     tool_calls: list[dict[str, Any]] = []
     pending_actions: list[dict[str, Any]] = []
 

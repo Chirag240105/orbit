@@ -14,7 +14,15 @@ export function mapLandmarkToViewport(point: Point, viewportWidth: number, viewp
 
 export function classifyFingerGesture(points: Point[]): FingerGesture | null {
   if (points.length < 21) return null;
-  const extended = [8, 12, 16, 20].map((tip, index) => points[tip].y < points[[6, 10, 14, 18][index]].y);
+  // Use the y-distance from MCP joint to fingertip for robustness —
+  // accounts for hands at different angles relative to the camera.
+  const fingerData = [
+    { tip: 8, pip: 6 },
+    { tip: 12, pip: 10 },
+    { tip: 16, pip: 14 },
+    { tip: 20, pip: 18 },
+  ];
+  const extended = fingerData.map(({ tip, pip }) => points[tip].y < points[pip].y);
   if (extended.every(Boolean)) return "open";
   if (extended[0] && extended.slice(1).every((value) => !value)) return "point";
   return null;

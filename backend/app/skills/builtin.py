@@ -32,6 +32,14 @@ class PlanOutput(BaseModel):
     tasks: list[PlanTask]
 
 
+class SystemDesignOutput(BaseModel):
+    answer: str
+    key_points: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    follow_ups: list[str] = Field(default_factory=list)
+    suggested_memory: str | None = Field(None, description="A durable fact worth remembering, only if the user stated one")
+
+
 class GeneralQA(Skill):
     name, title = "general_qa", "General question answering"
     description = "Answer a question clearly, using remembered context when relevant."
@@ -87,3 +95,35 @@ class TaskPlan(Skill):
 
     def fallback_output(self, text: str) -> dict:
         return {"summary": text, "tasks": []}
+
+
+class SystemDesign(Skill):
+    name, title = "system_design", "Explain a system design"
+    description = "Explain the architecture of a well-known system (Amazon, Netflix, Twitter, Uber) for interview preparation."
+    required_permissions = ("memory.read",)
+    output_model = SystemDesignOutput
+    system_prompt = (
+        "Explain the system's architecture as if preparing for a system-design interview. "
+        "Cover requirements, high-level architecture, main components and their responsibilities, "
+        "key APIs and data models, database and cache choices, message queues and async processing, "
+        "scaling and reliability strategies, security and observability, and failure handling. "
+        "Clearly label this as a proposed interview architecture, not the company's private internal implementation. "
+        "Keep the answer concise and readable."
+    )
+
+    def demo_output(self, ctx: SkillContext) -> dict:
+        return {
+            "answer": (
+                f"[Demo mode, not model inference] Here is a placeholder system-design overview for: {ctx.message[:200]}\n\n"
+                "In a real session, ORBIT would walk through requirements, high-level architecture, "
+                "components (gateway, services, databases, cache, queue), data flow, scaling, and failure handling. "
+                "Open the Visual Learning Studio to explore a curated Amazon-like e-commerce architecture in 3D."
+            ),
+            "key_points": ["API gateway as the single entry point", "Database-per-service for isolation", "Redis cache for hot reads", "Message queue for async order processing"],
+            "risks": ["Cache stampede on cold start", "Overselling without atomic inventory checks", "Payment double-charge without idempotency keys"],
+            "follow_ups": ["How would you handle flash-sale traffic spikes?", "What happens if the payment gateway is down?", "How do you ensure inventory consistency?"],
+            "suggested_memory": None,
+        }
+
+    def fallback_output(self, text: str) -> dict:
+        return {"answer": text, "key_points": [], "risks": [], "follow_ups": []}
