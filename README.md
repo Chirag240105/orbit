@@ -13,8 +13,8 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 
 | Feature | Status |
 |---|---|
-| Backend API, error handling, CORS, chat/auth rate limits, audit | **Working**, 84 passed and 2 skipped in the current suite |
-| PostgreSQL + pgvector schema, Alembic migration, JWT auth and user scoping | **Implemented; migration verified on SQLite. PostgreSQL runtime not verified here.** |
+| Backend API, error handling, CORS, chat/auth rate limits, audit | **Verified by tests:** 88 passed, 2 skipped; Ruff passes. Two platform-dependent tests are skipped. |
+| PostgreSQL + pgvector schema, Alembic migration, JWT auth and user scoping | **Implemented; SQLite migration matches current SQLAlchemy metadata and startup migration is tested. PostgreSQL runtime not verified here.** |
 | Chat orchestration, skill registry (4 skills), schema-validated output | **Working** (tested with demo provider and mocked HTTP) |
 | Nebius and NVIDIA OpenAI-compatible gateway | **Gateway implemented; live calls unverified.** Choose task model IDs with `scripts/list_models.py`; needs a provider key |
 | Demo mode (`LLM_PROVIDER=demo`, `ORBIT_DEMO_MODE=true`, or `ORBIT_MOCK_AI=true`) | **Deterministic placeholder**: labeled "Demo", no model call |
@@ -26,10 +26,10 @@ ORBIT is a persistent, multimodal personal AI for developers and students. It re
 | Streaming chat and decision UI | **Implemented**: authenticated WebSocket event stream (POST `/api/chat` remains available), memory chips, action approval cards, answer rationale, and per-user debug turns. Live provider streaming not verified. |
 | Workspace policy, read-only inspection, proposal and approval flow | **Working**, unit and API tested |
 | Secret redaction, consent before external send | **Working**, best-effort redaction |
-| All 8 main screens | **Built**; typecheck, 14 frontend tests and production build pass. **Not yet reviewed in a real browser** |
-| 3D scene and camera panel | **Built; browser and device behavior not manually verified** |
-| MediaPipe hand gestures (point, pinch, open hand, swipe) | **Implemented on-device with mouse/keyboard fallback; 20+ FPS not verified on target devices** |
-| Alembic migrations | **Initial user-scoped schema implemented**; empty SQLite migration tested. PostgreSQL runtime not verified here. |
+| All 8 main screens | **Build, typecheck, and 15 frontend tests pass.** Not yet reviewed in a real browser. |
+| 3D scene and camera panel | **Implemented** with an architecture scene and transparent cursor overlay. WebGL and camera behavior are not manually verified. |
+| MediaPipe hand gestures (point, pinch, open hand, swipe) | **Classifier and coordinate mapping are unit tested with recorded landmarks.** Camera fallback below 20 FPS is implemented; real-device frame rate and gesture behavior are unverified. |
+| Alembic migrations | **Current SQLite schema matches model metadata;** startup upgrades pending revisions and fails clearly if migration fails. PostgreSQL runtime not verified here. |
 | Container deployment and submission feedback assets | **Prepared**; public deployment, managed PostgreSQL, seeded account, and HTTPS URL still need deployment credentials and verification (see [`docs/SUBMISSION.md`](docs/SUBMISSION.md)) |
 
 ## Architecture
@@ -76,6 +76,7 @@ Create an account on the ORBIT sign-in screen. Set a stable random `ORBIT_JWT_SE
 - *Setup banner in chat:* no key and no demo mode set; edit `.env` and restart the backend.
 - *`model_not_configured` or `provider_model_not_found`:* set model IDs for the selected provider using the IDs returned by `python scripts/list_models.py`.
 - *`provider_empty_response`:* Nemotron on Token Factory is a reasoning model and can spend its budget thinking; retry.
+- *SQLite `no such column: memories.project_id` or `no such table: schedule_blocks`:* stop the backend and back up the database if it contains data you need. Set `ORBIT_DATABASE_URL` to a SQLite file under `backend/`, set `ORBIT_DEMO_EMAIL` and `ORBIT_DEMO_PASSWORD` (at least 12 characters), then run `backend\.venv\Scripts\python.exe scripts\reset_dev_db.py` from the repository root. Add `--yes` to skip the deletion prompt. This permanently deletes that configured SQLite file and its WAL sidecars, then migrates and seeds it. For an Alembic-managed database that should retain data, run `python -m app.db.migrate` from `backend/` instead.
 - *3D view blank:* WebGL is unavailable or disabled in the browser.
 - *Camera blocked:* allow it in the browser's site settings; it needs `localhost` or HTTPS.
 - *`workspace_too_broad`:* choose a project folder, not `/`, your home folder, or a top-level system folder.

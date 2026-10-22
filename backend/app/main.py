@@ -41,8 +41,13 @@ log = logging.getLogger("orbit")
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    init_db(settings.database_url, create_tables=settings.database_url in ("sqlite://", "sqlite:///:memory:"))
+    init_db(settings.database_url)
     app = FastAPI(title="ORBIT API", version=VERSION, docs_url="/api/docs", openapi_url="/api/openapi.json")
+
+    @app.get("/health", include_in_schema=False)
+    def liveness():
+        return {"status": "ok"}
+
     app.state.settings = settings
     app.state.jwt_secret = settings.jwt_secret or secrets.token_urlsafe(48)
     app.state.auth_rate_limit = RateLimiter(limit=10, window_s=60)

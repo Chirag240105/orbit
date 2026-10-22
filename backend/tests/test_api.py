@@ -64,6 +64,29 @@ def test_tasks_flow(client):
     assert client.delete(f"/api/tasks/{t['id']}").status_code == 204
 
 
+def test_projects_and_notes_crud(client):
+    project = client.post("/api/projects", json={"name": "ORBIT", "description": "Personal AI"})
+    assert project.status_code == 201
+    project = project.json()
+    note = client.post("/api/notes", json={
+        "title": "Decision", "content": "Use PostgreSQL", "project_id": project["id"],
+    })
+    assert note.status_code == 201
+    note = note.json()
+    assert client.get("/api/projects").json()[0]["id"] == project["id"]
+    assert client.get("/api/notes", params={"project_id": project["id"]}).json()[0]["id"] == note["id"]
+    assert client.patch(f"/api/projects/{project['id']}", json={"description": "Updated"}).json()["description"] == "Updated"
+    assert client.patch(f"/api/notes/{note['id']}", json={"content": "Revised"}).json()["content"] == "Revised"
+    assert client.delete(f"/api/projects/{project['id']}").status_code == 204
+    assert client.get("/api/notes").json()[0]["project_id"] is None
+    assert client.delete(f"/api/notes/{note['id']}").status_code == 204
+
+
+def test_project_and_note_require_owned_project(client):
+    response = client.post("/api/notes", json={"title": "Orphan", "project_id": 999})
+    assert response.status_code == 404
+
+
 def test_cors_rejects_unknown_origin(client):
     r = client.get("/api/health", headers={"Origin": "http://evil.example"})
     assert "access-control-allow-origin" not in r.headers

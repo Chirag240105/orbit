@@ -29,6 +29,44 @@ class VisionContextIn(BaseModel):
     project_name: str = Field(min_length=1, max_length=120)
 
 
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field("", max_length=4000)
+
+
+class ProjectPatch(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=120)
+    description: str | None = Field(None, max_length=4000)
+
+
+class ProjectOut(ORM):
+    id: int
+    name: str
+    description: str
+    created_at: UtcDt
+
+
+class NoteIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field("", max_length=20_000)
+    project_id: int | None = None
+
+
+class NotePatch(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=200)
+    content: str | None = Field(None, max_length=20_000)
+    project_id: int | None = None
+
+
+class NoteOut(ORM):
+    id: int
+    title: str
+    content: str
+    project_id: int | None
+    created_at: UtcDt
+    updated_at: UtcDt
+
+
 class MemoryPatch(BaseModel):
     content: str | None = Field(None, min_length=1, max_length=2000)
     type: MemType | None = None

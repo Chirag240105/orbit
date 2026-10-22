@@ -42,4 +42,11 @@ This is a static import audit: dynamically loaded modules, entry points, plugin 
 
 ## Result
 
-No genuinely unused backend application module or empty feature implementation was identified for deletion. The main layout differences are naming/grouping choices (`migrations`, `models.py`, `schemas.py`, and `frontend/src/features`/`lib`) rather than missing source. Follow-up implementation should prioritize the stale SQLite schema and migrations, then verify the existing visual-learning implementation against the requested camera behavior before adding or moving code.
+No genuinely unused backend application module or empty feature implementation was identified for deletion. At audit time, the main layout differences were naming/grouping choices (`migrations`, `models.py`, `schemas.py`, and `frontend/src/features`/`lib`) rather than missing source. The follow-up work and its verification are recorded below.
+
+## Implementation follow-up (2026-10-22)
+
+- Split the API surface into `backend/app/api/{health,chat,actions,projects,memory,vision,skills,code,schedule,tasks}.py`; `routes.py` remains a small compatibility aggregator for the app factory.
+- Replaced runtime `create_all` with Alembic upgrade-and-head verification. The existing three-revision history is retained for upgrade compatibility; the final revision matches all current SQLAlchemy metadata on SQLite.
+- Moved the existing visual-learning feature into the requested `frontend/src/vision/` location and extended its gestures, fallback, scene, and save flow.
+- Added `backend/app/db/migrate.py`, `scripts/reset_dev_db.py`, and troubleshooting instructions. These follow-up changes have automated regression coverage; live PostgreSQL, a physical camera, and a real browser review remain unverified.
