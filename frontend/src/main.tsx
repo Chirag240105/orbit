@@ -11,7 +11,7 @@ import { ProjectsPage } from "./features/projects/ProjectsPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { SkillsPage } from "./features/skills/SkillsPage";
 import { TasksPage } from "./features/tasks/TasksPage";
-import { VisualLearningPage } from "./features/visual-learning/VisualLearningPage";
+import { VisualLearningPage } from "./vision/VisualLearningPage";
 import "./styles/index.css";
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });

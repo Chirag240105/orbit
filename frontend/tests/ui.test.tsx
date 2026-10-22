@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Button, EmptyState, ErrorState } from "../src/components/ui";
 import { ApiError, request, saveAuthToken } from "../src/lib/api";
 import { kb, timeAgo } from "../src/lib/format";
-import { stepsOf, subjects, threeTierScene } from "../src/features/visual-learning/scenes";
+import { stepsOf, subjects, threeTierScene } from "../src/vision/scenes";
 
 describe("ui primitives", () => {
   it("Button fires onClick and respects disabled", () => {

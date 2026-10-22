@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Badge, Button, EmptyState, PageHeader, Panel } from "../../components/ui";
-import { api } from "../../lib/api";
+import { Badge, Button, EmptyState, PageHeader, Panel } from "../components/ui";
+import { api } from "../lib/api";
 import { CameraPanel } from "./CameraPanel";
 import type { HandGesture } from "./CameraPanel";
 import { SceneCanvas } from "./SceneCanvas";
 import { stepsOf, subjects } from "./scenes";
+import type { CursorPosition } from "./gestures";
 
 export function VisualLearningPage() {
   const qc = useQueryClient();
@@ -26,10 +27,10 @@ export function VisualLearningPage() {
     onSuccess: () => { setGestureStatus("Saved as a confirmed VISION memory linked to " + subject.title + "."); qc.invalidateQueries({ queryKey: ["memories"] }); },
     onError: () => setGestureStatus("Could not save the visual memory."),
   });
-  const handleGesture = (gesture: HandGesture, x: number) => {
+  const handleGesture = (gesture: HandGesture, position: CursorPosition) => {
     if (!scene) return;
     const components = scene.components;
-    const targetIndex = Math.min(components.length - 1, Math.max(0, Math.floor(x * components.length)));
+    const targetIndex = Math.min(components.length - 1, Math.max(0, Math.floor(position.screenX * components.length)));
     if (gesture === "point") {
       setSelected(components[targetIndex].id); setLearning(null);
       setGestureStatus("Point selected " + components[targetIndex].label + ".");
@@ -64,7 +65,7 @@ export function VisualLearningPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         <div>
           {!scene ? (
-            <EmptyState title={`${subject.title} isn't supported yet`}>{subject.note} Add a scene in <code className="font-mono">features/visual-learning/scenes.ts</code>.</EmptyState>
+            <EmptyState title={`${subject.title} isn't supported yet`}>{subject.note} Add a scene in <code className="font-mono">vision/scenes.ts</code>.</EmptyState>
           ) : (
             <div className="relative h-[26rem] overflow-hidden rounded-lg border border-line md:h-[32rem]">
               {!ready && <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg text-sm text-muted">Loading 3D scene…</div>}
@@ -86,8 +87,9 @@ export function VisualLearningPage() {
                 <p className="mt-2 text-sm leading-relaxed text-muted">{sel.details}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button onClick={() => setIsolated(isolated === sel.id ? null : sel.id)}>{isolated === sel.id ? "Show all parts" : "Isolate this part"}</Button>
-                  <Button disabled={remember.isPending} onClick={() => remember.mutate("Remembered from Visual Learning: " + subject.title + " — " + sel.label + ". " + sel.summary)}>Remember to project</Button>
-                  <Link to="/chat" state={{ prompt: `In a three-tier cloud web app, explain the "${sel.label}" in simple terms, and what breaks if it fails.` }}><Button variant="ghost">Ask ORBIT in chat</Button></Link>
+                  <Link to="/chat" state={{ prompt: `Explain the "${sel.label}" in the ${subject.title} architecture in simple terms, and what breaks if it fails.` }}><Button>Explain</Button></Link>
+                  <Button disabled={remember.isPending} onClick={() => remember.mutate("Remembered from Visual Learning: " + subject.title + " — " + sel.label + ". " + sel.summary)}>Remember</Button>
+                  <Button variant="primary" disabled={remember.isPending} onClick={() => remember.mutate("Added from Visual Learning to " + subject.title + ": " + sel.label + ". " + sel.summary)}>Add to Project</Button>
                 </div>
               </div>
             ) : <p className="text-sm text-muted">{scene ? "Select a part in the scene or in the list below." : "Choose a supported subject."}</p>}
@@ -113,7 +115,7 @@ export function VisualLearningPage() {
               ))}</ul>
             </Panel>
           )}
-          <Panel title="Camera and gestures (optional)"><CameraPanel onGesture={handleGesture} /><p role="status" className="mt-2 text-xs text-muted">{gestureStatus || "Use point, pinch (hold 300 ms), open hand, or swipe left/right. The mouse and parts list remain available."}</p>{remember.error && <p className="mt-1 text-xs text-danger">Memory save failed. Try the button above.</p>}</Panel>
+          <Panel title="Camera and gestures (optional)"><CameraPanel onGesture={handleGesture} /><p role="status" className="mt-2 text-xs text-muted">{gestureStatus || "Use point, pinch (hold 300 ms), open hand, or swipe left/right. The mouse and parts list remain available."}</p>{remember.isSuccess && <p role="status" className="mt-2 rounded bg-ok/10 p-2 text-xs text-ok">Saved as a VISION memory linked to {subject.title}. <Link to="/chat" state={{ prompt: `I saved a visual memory about ${sel?.label ?? "the selected architecture component"} in ${subject.title}. Confirm it and explain how it relates to the project.` }}>Continue in chat</Link></p>}{remember.error && <p className="mt-1 text-xs text-danger">Memory save failed. Try the button above.</p>}</Panel>
         </div>
       </div>
     </div>
