@@ -20,16 +20,24 @@ class Settings(BaseSettings):
     )
     jwt_secret: str | None = Field(None, validation_alias=_alias("ORBIT_JWT_SECRET", "jwt_secret"))
     jwt_lifetime_minutes: int = Field(60, ge=5, le=10080, validation_alias=_alias("ORBIT_JWT_LIFETIME_MINUTES", "jwt_lifetime_minutes"))
-    llm_provider: Literal["nebius", "nvidia", "demo"] = Field(
+    llm_provider: Literal["nebius", "nvidia", "gemini", "demo"] = Field(
         "nebius", validation_alias=_alias("LLM_PROVIDER", "llm_provider")
     )
     nebius_api_key: str | None = Field(None, validation_alias=_alias("NEBIUS_API_KEY", "nebius_api_key"))
     nvidia_api_key: str | None = Field(None, validation_alias=_alias("NVIDIA_API_KEY", "nvidia_api_key"))
+    gemini_api_key: str | None = Field(
+        None, validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY", "gemini_api_key")
+    )
     nebius_base_url: str = Field(
         "https://api.tokenfactory.nebius.com/v1/", validation_alias=_alias("NEBIUS_BASE_URL", "nebius_base_url")
     )
     nvidia_base_url: str = Field(
         "https://integrate.api.nvidia.com/v1", validation_alias=_alias("NVIDIA_BASE_URL", "nvidia_base_url")
+    )
+    # Google's OpenAI-compatible Gemini endpoint.
+    gemini_base_url: str = Field(
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        validation_alias=_alias("GEMINI_BASE_URL", "gemini_base_url"),
     )
     model_planner: str | None = Field(
         None, validation_alias=AliasChoices("MODEL_PLANNER", "model_planner", "NEBIUS_MODEL")
@@ -50,17 +58,26 @@ class Settings(BaseSettings):
     provider_timeout_s: float = Field(90.0, gt=0, validation_alias=_alias("ORBIT_PROVIDER_TIMEOUT_S", "provider_timeout_s"))
     provider_retries: int = Field(1, ge=0, le=1, validation_alias=_alias("ORBIT_PROVIDER_RETRIES", "provider_retries"))
 
-    @field_validator("nebius_base_url", "nvidia_base_url")
+    @field_validator("nebius_base_url", "nvidia_base_url", "gemini_base_url")
     @classmethod
     def _https_only(cls, v: str) -> str:
         if not (v.startswith("https://") or v.startswith("http://localhost") or v.startswith("http://127.0.0.1")):
             raise ValueError("Model provider base URLs must use https:// (http only allowed for localhost)")
         return v.rstrip("/")
 
-    @field_validator("nebius_api_key", "nvidia_api_key")
+    @field_validator("nebius_api_key", "nvidia_api_key", "gemini_api_key")
     @classmethod
     def _blank_key_is_none(cls, v: str | None) -> str | None:
         return v.strip() or None if v else None
+
+    @property
+    def active_base_url(self) -> str | None:
+        """Endpoint of the selected hosted provider; None in demo mode."""
+        return {"nebius": self.nebius_base_url, "nvidia": self.nvidia_base_url, "gemini": self.gemini_base_url}.get(self.llm_provider)
+
+    @property
+    def active_api_key(self) -> str | None:
+        return {"nebius": self.nebius_api_key, "nvidia": self.nvidia_api_key, "gemini": self.gemini_api_key}.get(self.llm_provider)
 
     @property
     def origins(self) -> list[str]:

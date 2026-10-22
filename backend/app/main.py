@@ -18,6 +18,7 @@ from app.providers import build_provider
 from app.providers.base import ChatProvider, ProviderResult
 from app.schemas import ChatRequest
 from app.services.model_gateway import ModelGateway
+from app.services.scene_generator import SceneGenerator
 from app.skills.registry import default_registry
 
 
@@ -56,6 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.model_gateway = gateway
     app.state.provider = build_provider(settings, gateway)
     app.state.registry = default_registry()
+    app.state.scene_generator = SceneGenerator(gateway)
     app.add_middleware(
         CORSMiddleware, allow_origins=settings.origins, allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "Authorization"], allow_credentials=False,

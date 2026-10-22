@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-23T00:20:00Z",
+  "title": "Design System: ORBIT",
+  "extensions": {
+    "colorMeta": {
+      "night": {
+        "role": "neutral",
+        "displayName": "Night",
+        "tonalRamp": [
+          "#02080c",
+          "#06121a",
+          "#0b1d27",
+          "#12293a",
+          "#1d3a4c",
+          "#2f5568",
+          "#5c8590",
+          "#97b7b8"
+        ]
+      },
+      "aurora-green": {
+        "role": "primary",
+        "displayName": "Aurora green",
+        "tonalRamp": [
+          "#053b2c",
+          "#087a5c",
+          "#0ea07a",
+          "#1fc597",
+          "#34e3b0",
+          "#6eebc6",
+          "#a6f3db",
+          "#dbfbf1"
+        ]
+      },
+      "violet": {
+        "role": "secondary",
+        "displayName": "Violet",
+        "tonalRamp": [
+          "#2a1b6b",
+          "#4a33b8",
+          "#6d4fe0",
+          "#8b6ff5",
+          "#a78bfa",
+          "#c1aefc",
+          "#d9cffd",
+          "#f0ebff"
+        ]
+      },
+      "glacier-cyan": {
+        "role": "tertiary",
+        "displayName": "Glacier cyan",
+        "tonalRamp": [
+          "#06384a",
+          "#0a7ea0",
+          "#1aa0c2",
+          "#3cb9d6",
+          "#5ccfe6",
+          "#8adff0",
+          "#b9ecf7",
+          "#e3f8fc"
+        ]
+      },
+      "day-sky": {
+        "role": "neutral",
+        "displayName": "Day sky"
+      },
+      "frost": {
+        "role": "neutral",
+        "displayName": "Frost"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The Home question and other single lead headlines."
+      },
+      "title": {
+        "displayName": "Page title",
+        "purpose": "One per screen, above a Haze description."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "ORBIT beside the orbit mark only, in Unbounded."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All running text and controls."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Code, API paths, file paths and step numbers only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "accent-glow",
+        "value": "0 6px 18px -8px var(--color-accent)",
+        "purpose": "Lifts the primary button off the ground."
+      },
+      {
+        "name": "sheet",
+        "value": "0 24px 60px -20px rgba(0,0,0,0.6)",
+        "purpose": "The sign-in sheet over the star field."
+      }
+    ],
+    "motion": [
+      {
+        "name": "orbit-node",
+        "value": "rotate 360deg over 9s linear, infinite",
+        "purpose": "The node travelling the active navigation ring. Disabled under reduced motion."
+      },
+      {
+        "name": "label-reveal",
+        "value": "max-width 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "3D labels expanding from step number to full name."
+      },
+      {
+        "name": "rail-collapse",
+        "value": "width 200ms",
+        "purpose": "Sidebar collapsing to the icon rail."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action per area: Explore system, Sign in, Start tour.",
+      "html": "<button class=\"ds-btn-primary\">Explore system</button>",
+      "css": ".ds-btn-primary { background: #34e3b0; color: #06121a; font: 600 14px/1.4 'Figtree Variable', system-ui, sans-serif; padding: 6px 14px; border: 0; border-radius: 8px; box-shadow: 0 6px 18px -8px #34e3b0; cursor: pointer; transition: filter .15s; } .ds-btn-primary:hover { filter: brightness(1.1); } .ds-btn-primary:focus-visible { outline: 2px solid #34e3b0; outline-offset: 2px; } .ds-btn-primary:disabled { background: #12293a; color: #97b7b8; box-shadow: none; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Supporting actions: Reset view, Full screen, Explain.",
+      "html": "<button class=\"ds-btn-secondary\">Reset view</button>",
+      "css": ".ds-btn-secondary { background: #12293a; color: #e8fbf6; font: 500 14px/1.4 'Figtree Variable', system-ui, sans-serif; padding: 6px 14px; border: 1px solid #1d3a4c; border-radius: 8px; cursor: pointer; transition: border-color .15s; } .ds-btn-secondary:hover { border-color: #97b7b8; } .ds-btn-secondary:focus-visible { outline: 2px solid #34e3b0; outline-offset: 2px; }"
+    },
+    {
+      "name": "System Search",
+      "kind": "input",
+      "refersTo": "search-field",
+      "description": "The lead control on Home and Visual Learning.",
+      "html": "<label class=\"ds-search\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input placeholder=\"Search any system: Uber, Netflix, WhatsApp\u2026\" /></label>",
+      "css": ".ds-search { position: relative; display: block; color: #97b7b8; } .ds-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); } .ds-search input { width: 100%; background: #0b1d27; color: #e8fbf6; border: 1px solid #1d3a4c; border-radius: 12px; padding: 12px 16px 12px 44px; font: 400 15px 'Figtree Variable', system-ui, sans-serif; } .ds-search input:focus { outline: none; border-color: #34e3b0; }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Built-in systems and generation suggestions.",
+      "html": "<span class=\"ds-chip\">Netflix</span> <span class=\"ds-chip ds-chip-on\">ChatGPT-style LLM</span>",
+      "css": ".ds-chip { display: inline-block; border: 1px solid #1d3a4c; color: #97b7b8; border-radius: 999px; padding: 4px 12px; font: 500 12px 'Figtree Variable', system-ui, sans-serif; cursor: pointer; } .ds-chip:hover { border-color: #97b7b8; color: #e8fbf6; } .ds-chip-on { border-color: #34e3b0; background: #34e3b026; color: #e8fbf6; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Explanation, tour and parts columns; Home summaries.",
+      "html": "<section class=\"ds-panel\"><header>Explanation</header><div>Select a part in the scene or in the list below.</div></section>",
+      "css": ".ds-panel { background: #0b1d27; border: 1px solid #1d3a4c; border-radius: 12px; color: #e8fbf6; font: 400 15px 'Figtree Variable', system-ui, sans-serif; } .ds-panel header { padding: 12px 16px; border-bottom: 1px solid #1d3a4c; font: 600 14.4px 'Sora Variable', system-ui, sans-serif; } .ds-panel div { padding: 16px; color: #97b7b8; }"
+    },
+    {
+      "name": "Active Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Navigation item with the orbit-ring signature around its icon.",
+      "html": "<a class=\"ds-nav\"><span class=\"ds-ring\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\"><circle cx=\"12\" cy=\"12\" r=\"10\" stroke=\"#34e3b0\" stroke-opacity=\".45\" stroke-width=\"1.2\"/><circle cx=\"12\" cy=\"2\" r=\"2.1\" fill=\"#34e3b0\"/></svg></span>Visual Learning</a>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background: #12293a; color: #e8fbf6; font: 600 14px 'Figtree Variable', system-ui, sans-serif; } .ds-ring { display: grid; place-items: center; width: 24px; height: 24px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Aurora atlas",
+    "overview": "Systems are constellations you explore. The app is a working tool first; the night palette, Sora display voice and the orbit-ring signature carry the world while every control stays familiar.",
+    "keyCharacteristics": [
+      "Blue-black teal night with a matching day theme",
+      "One aurora-green accent for action and selection",
+      "Orbit ring as logo and active marker",
+      "3D stage stays night in both themes"
+    ],
+    "rules": [
+      {
+        "name": "One aurora",
+        "body": "Aurora green marks only what you can act on or what is selected.",
+        "section": "colors"
+      },
+      {
+        "name": "Color encodes kind",
+        "body": "A 3D part's color is identical on its model, label, list number and panel header.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Use Sora for titles and the wordmark, Figtree for everything else",
+      "Mark the active item with the orbit ring"
+    ],
+    "donts": [
+      "No gradient text or decorative glass",
+      "No second action accent",
+      "Keep space imagery to the logo, sign-in and 3D stage"
+    ]
+  }
+}

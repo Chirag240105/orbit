@@ -20,10 +20,10 @@ async def main() -> int:
     if provider == "demo":
         print("LLM_PROVIDER=demo has no remote model catalogue.")
         return 0
-    key = settings.nebius_api_key if provider == "nebius" else settings.nvidia_api_key
-    base = settings.nebius_base_url if provider == "nebius" else settings.nvidia_base_url
+    key = settings.active_api_key
+    base = settings.active_base_url
     if not key:
-        key_name = "NEBIUS_API_KEY" if provider == "nebius" else "NVIDIA_API_KEY"
+        key_name = {"nebius": "NEBIUS_API_KEY", "nvidia": "NVIDIA_API_KEY", "gemini": "GEMINI_API_KEY"}[provider]
         raise SystemExit(f"{key_name} is not configured.")
     print(f"Provider: {provider} | endpoint: {base}")
     try:

@@ -78,6 +78,7 @@ export const api = {
   schedule: (day: string) => request<T.ScheduleBlock[]>("GET", `/schedule?date=${encodeURIComponent(day)}`),
   explainCode: (body: { mode: "selection" | "file" | "project" | "flow"; workspace_id?: number; path?: string; selection?: string; consent_external?: boolean }) => request<T.CodeExplainResult>("POST", "/code/explain", body),
   saveVisionContext: (body: { content: string; project_name: string }) => request<T.Memory>("POST", "/vision/context", body),
+  generateScene: (topic: string) => request<T.SceneResponse>("POST", "/vision/scene", { topic }),
   conversations: () => request<T.Conversation[]>("GET", "/conversations"),
   messages: (id: number) => request<T.Message[]>("GET", `/conversations/${id}/messages`),
   deleteConversation: (id: number) => request<void>("DELETE", `/conversations/${id}`),

@@ -276,7 +276,7 @@ async def run_chat(
             "user_id": db.info.get("user_id"),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "provider": provider.name,
-            "endpoint": settings.nebius_base_url if settings.llm_provider == "nebius" else settings.nvidia_base_url if settings.llm_provider == "nvidia" else None,
+            "endpoint": settings.active_base_url,
             "model": provider_stats.get("model", provider.model),
             "latency_ms": provider_stats.get("latency_ms"),
             "tokens": {"prompt": provider_stats.get("prompt_tokens"), "completion": provider_stats.get("completion_tokens")},

@@ -30,11 +30,11 @@ export function SkillsPage() {
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ["skills"], queryFn: api.skills });
   const shown = data?.filter((s) => (s.title + s.description).toLowerCase().includes(q.toLowerCase()));
   return (
-    <div className="max-w-3xl">
+    <div>
       <PageHeader title="Skills" description="Skills are reusable abilities with a fixed input, a validated output, and declared permissions. Turning a skill on never gives it more access than the permissions listed here." />
-      <input aria-label="Search skills" className={`${inputCls} mb-4`} placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} />
-      {isLoading ? <Skeleton className="h-28" /> : error ? <ErrorState error={error} retry={() => refetch()} /> : !shown?.length ? <EmptyState title="No skills match" /> : <div className="space-y-3">{shown.map((s) => <SkillCard key={s.name} s={s} />)}</div>}
-      <Panel title="Add your own skill" className="mt-6">
+      <input aria-label="Search skills" className={`${inputCls} mb-4 max-w-xl`} placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} />
+      {isLoading ? <Skeleton className="h-28" /> : error ? <ErrorState error={error} retry={() => refetch()} /> : !shown?.length ? <EmptyState title="No skills match" /> : <div className="grid items-start gap-3 xl:grid-cols-2">{shown.map((s) => <SkillCard key={s.name} s={s} />)}</div>}
+      <Panel title="Add your own skill" className="mt-6 max-w-4xl">
         <p className="text-sm text-muted">Skills are Python classes registered in <code className="font-mono">backend/app/skills/registry.py</code>. Follow <code className="font-mono">docs/SKILL_DEVELOPMENT.md</code> and the working example in <code className="font-mono">examples/example-skill</code>. Restart the backend and the new skill appears here.</p>
       </Panel>
     </div>

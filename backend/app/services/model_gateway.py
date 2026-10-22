@@ -16,6 +16,8 @@ from app.config import Settings
 from app.core.errors import AppError
 
 log = logging.getLogger("orbit.model_gateway")
+GEMINI_DEFAULT_MODEL = "gemini-3.5-flash"
+_KEY_NAMES = {"nvidia": "NVIDIA_API_KEY", "gemini": "GEMINI_API_KEY"}
 Task = Literal["planner", "fast"]
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
@@ -41,12 +43,15 @@ class ModelGateway:
         self._reachability_checked_monotonic: float | None = None
 
     def _connection(self) -> tuple[str, str | None]:
-        if self.provider == "nvidia":
-            return self.settings.nvidia_base_url, self.settings.nvidia_api_key
-        return self.settings.nebius_base_url, self.settings.nebius_api_key
+        if self.provider == "demo":
+            return self.settings.nebius_base_url, self.settings.nebius_api_key
+        return self.settings.active_base_url or "", self.settings.active_api_key
 
     def model_for(self, task: Task) -> str:
         model = self.settings.model_planner if task == "planner" else self.settings.model_fast
+        if not model and self.provider == "gemini":
+            # Gemini works out of the box: the fast task reuses the planner model, else a default.
+            model = self.settings.model_planner or GEMINI_DEFAULT_MODEL
         if not model:
             raise AppError("model_not_configured", f"Set MODEL_{task.upper()} for the active provider.", 503)
         return model
@@ -57,7 +62,7 @@ class ModelGateway:
 
     def _require_configured(self) -> None:
         if not self.configured:
-            key = "NVIDIA_API_KEY" if self.provider == "nvidia" else "NEBIUS_API_KEY"
+            key = _KEY_NAMES.get(self.provider, "NEBIUS_API_KEY")
             raise AppError("provider_not_configured", f"Set {key} or select LLM_PROVIDER=demo.", 503)
 
     async def _request(self, method: str, path: str, *, json_body: dict | None = None) -> httpx.Response:
@@ -86,11 +91,12 @@ class ModelGateway:
         if response.status_code >= 400:
             raise AppError("provider_error", f"The model provider returned an error ({response.status_code}).", 502)
 
-    async def complete(self, messages: list[dict], task: Task = "planner") -> ModelResult:
+    async def complete(self, messages: list[dict], task: Task = "planner", max_tokens: int = 4096, extra: dict | None = None) -> ModelResult:
+        """`extra` adds provider-specific request fields, such as Gemini's reasoning_effort."""
         model = self.model_for(task)
         started = time.perf_counter()
         response = await self._request("POST", "chat/completions", json_body={
-            "model": model, "messages": messages, "temperature": 0.2, "max_tokens": 4096,
+            "model": model, "messages": messages, "temperature": 0.2, "max_tokens": max_tokens, **(extra or {}),
         })
         self._check_response(response)
         try:

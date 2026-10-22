@@ -20,3 +20,16 @@ export const openHand: Point[] = [
 export const pinchingHand: Point[] = pointingHand.map((point, index) =>
   index === 4 ? { x: 0.405, y: 0.285 } : point,
 );
+
+// All four fingers curled; the index tip folds back below its middle joint.
+const curled: Point[] = pointingHand.map((point, index) =>
+  index === 7 ? { x: 0.41, y: 0.55 } : index === 8 ? { x: 0.42, y: 0.60 } : point,
+);
+
+export const thumbsUp: Point[] = curled.map((point, index) =>
+  index === 3 ? { x: 0.39, y: 0.52 } : index === 4 ? { x: 0.38, y: 0.40 } : point,
+);
+
+export const fist: Point[] = curled.map((point, index) =>
+  index === 3 ? { x: 0.44, y: 0.70 } : index === 4 ? { x: 0.52, y: 0.66 } : point,
+);

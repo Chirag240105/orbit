@@ -68,7 +68,8 @@ describe("curated scene data", () => {
     const steps = stepsOf(threeTierScene).map((c) => c.step);
     expect(new Set(steps).size).toBe(steps.length);
   });
-  it("marks unsupported subjects explicitly", () => {
-    expect(subjects.some((s) => !s.supported && !s.scene)).toBe(true);
+  it("gives every built-in subject a scene", () => {
+    expect(subjects.length).toBeGreaterThan(0);
+    expect(subjects.every((s) => s.supported && s.scene)).toBe(true);
   });
 });

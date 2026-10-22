@@ -6,6 +6,10 @@ import { Shell } from "./app/Shell";
 import { WorkspaceProvider } from "./app/WorkspaceContext";
 import { PageLoader } from "./components/ui";
 import { HomePage } from "./features/home/HomePage";
+import "@fontsource-variable/unbounded";
+import "@fontsource-variable/sora";
+import "@fontsource-variable/figtree";
+import "@fontsource-variable/jetbrains-mono";
 import "./styles/index.css";
 
 // Lazy-load feature pages so Three.js, MediaPipe, and other heavy deps
