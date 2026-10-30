@@ -5,11 +5,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://orbit-backend.onrender.com/api/$1"
+      "destination": "https://orbit-4zdd.onrender.com/api/$1"
     },
     {
       "source": "/ws/(.*)",
-      "destination": "https://orbit-backend.onrender.com/ws/$1"
+      "destination": "https://orbit-4zdd.onrender.com/ws/$1"
     },
     {
       "source": "/(.*)",
