@@ -1,0 +1,22 @@
+name: keep-alive
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes (Render sleeps after 15)
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping backend health
+        env:
+          URL: ${{ vars.HEALTH_URL }}
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL" || echo 000)
+            echo "attempt $i -> HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          exit 1
