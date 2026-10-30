@@ -10,17 +10,13 @@ Covers:
 """
 
 import asyncio
-import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
-from app.config import Settings
 from app.providers.base import ChatProvider, ProviderResult
-from app.services.model_gateway import ModelGateway
-
 
 # ---------------------------------------------------------------------------
 # Minimal stubs
@@ -55,7 +51,6 @@ class _FakeGateway:
 
 def _make_streaming_provider(chunks: list[str], task_model: str = "fast-model") -> tuple[Any, "_FakeGateway", list[dict]]:
     """Return (streaming_provider, gateway, emitted_events)."""
-    from app.providers.base import ChatProvider, ProviderResult
 
     class _BaseProvider(ChatProvider):
         name = "nvidia"
