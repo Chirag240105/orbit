@@ -20,4 +20,5 @@ Backend tests use an in-memory SQLite database, a mocked HTTP transport for the 
 - [ ] Visual Learning — Amazon e-commerce scene: switch to the Amazon-like tab, open the system-design overview, select a component, verify structured content (APIs, data model, scaling, failure modes) appears.
 - [ ] Visual Learning — pinch-to-grab: start camera, pinch and move your hand to rotate the scene; release to stop rotating.
 - [ ] System-design chat: ask "Explain the system design of Amazon" — the system_design skill is selected and returns a structured answer with key points, risks, and follow-ups.
+- [ ] A11: A case-insensitive repository scan for removed provider names and key markers returns no matches; startup and a live chat work with only the NVIDIA API key configured.
 - [ ] Kill the backend: pages show "Backend not reachable".

@@ -1,15 +1,16 @@
-import { Link, useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
+import { Search, MessageSquareText, Github } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, EmptyState, PageHeader, Panel } from "../components/ui";
+import { Button, EmptyState, PageHeader, Panel, inputCls } from "../components/ui";
 import { ApiError, api } from "../lib/api";
 import { GestureGuide, HandPreview, useHandTracking, type HandTrackState } from "./CameraPanel";
 import { SceneCanvas } from "./SceneCanvas";
 import { sceneFromGenerated } from "./layout";
 import { createTopicScene, kindLabels, kindOf, matchCuratedSubject, stepsOf, subjects, type Scene } from "./scenes";
+import { FloatingExplainChat, type ComponentContext } from "./ExplainDrawer";
 
-const SUGGESTIONS = ["Uber", "Netflix", "WhatsApp", "Zomato", "Spotify", "Google Search", "Kubernetes", "Stock exchange"];
+const SUGGESTIONS = ["Uber", "Netflix", "WhatsApp", "Zomato", "Spotify", "Slack", "Kubernetes", "Stock exchange"];
 const GENERATION_STEPS = ["Identifying the core components", "Mapping how requests and data flow", "Writing explanations, failure modes and scaling notes", "Laying out the 3D scene"];
 
 /** Shown over the stage while the model designs a system; cycles through what it is doing. */
@@ -63,8 +64,89 @@ function useFullscreen(target: React.RefObject<HTMLElement | null>) {
   return { active, toggle, supported: typeof document !== "undefined" && !!document.fullscreenEnabled };
 }
 
+// ---------------------------------------------------------------------------
+// GitHub repo import widget
+// ---------------------------------------------------------------------------
+
+function GitHubImport({
+  onScene,
+  onGenerated,
+}: {
+  onScene: (scene: Scene) => void;
+  onGenerated: (model: string, cached: boolean) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const importMut = useMutation({
+    mutationFn: (u: string) => api.generateSceneFromGithub(u),
+    onSuccess: (res, u) => {
+      const repoName = u.replace("https://github.com/", "").split("/tree/")[0];
+      onScene(sceneFromGenerated(repoName, res.scene));
+      onGenerated(res.model, res.cached);
+      setUrl("");
+    },
+  });
+
+  if (!open) {
+    return (
+      <div className="-mt-2 mb-3">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-1.5 text-xs text-muted hover:text-text transition-colors"
+        >
+          <Github size={13} />
+          Import from GitHub repo
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="-mt-2 mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface p-3">
+      <div className="flex-1 min-w-56">
+        <label htmlFor="github-repo-url" className="mb-1 block text-xs text-muted">
+          Public GitHub repo URL
+        </label>
+        <input
+          id="github-repo-url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://github.com/owner/repo"
+          className={`${inputCls} text-sm`}
+          disabled={importMut.isPending}
+        />
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <Button
+          variant="primary"
+          disabled={!url.trim() || importMut.isPending}
+          onClick={() => importMut.mutate(url.trim())}
+        >
+          {importMut.isPending ? "Generating…" : "✦ Visualize"}
+        </Button>
+        <Button onClick={() => { setOpen(false); importMut.reset(); }}>Cancel</Button>
+      </div>
+      {importMut.error && (
+        <p className="w-full text-xs text-danger">
+          {importMut.error instanceof ApiError ? importMut.error.message : "Failed to generate scene."}
+        </p>
+      )}
+      <p className="w-full text-[10px] text-muted">
+        Public repos only · max 25 MB · results are model-assisted and may contain mistakes
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VisualLearningPage
+// ---------------------------------------------------------------------------
+
 export function VisualLearningPage() {
   const qc = useQueryClient();
+  const location = useLocation();
   const [subjectId, setSubjectId] = useState(subjects[0].id);
   const [selected, setSelected] = useState<string | null>(null);
   const [isolated, setIsolated] = useState<string | null>(null);
@@ -77,6 +159,9 @@ export function VisualLearningPage() {
   const [customScene, setCustomScene] = useState<Scene | null>(null);
   const [generated, setGenerated] = useState<{ model: string; cached: boolean } | null>(null);
   const [genNotice, setGenNotice] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  // explainCtx: the part that was selected when Explain was *clicked* — never changes on gesture/hover.
+  const [explainCtx, setExplainCtx] = useState<ComponentContext | null>(null);
   // Use a ref for hand tracking to avoid re-rendering on every inference frame.
   const handTrackRef = useRef<HandTrackState | null>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -156,7 +241,7 @@ export function VisualLearningPage() {
       setGenerated(null);
       const code = error instanceof ApiError ? error.code : "";
       setGenNotice(code === "scene_generation_unavailable"
-        ? "Connect a model (for example a Gemini API key) to generate full systems. Showing a starter map."
+        ? "Connect a model (for example an NVIDIA API key) to generate full systems. Showing a starter map."
         : `Couldn't generate “${t}”: ${error instanceof Error ? error.message : "unknown error"} Showing a starter map; try again.`);
     },
   });
@@ -180,6 +265,19 @@ export function VisualLearningPage() {
     searchSystem(queryTopic);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryTopic]);
+
+  // Handle navigation from Projects page with a pre-generated scene
+  const navState = location.state as { generatedScene?: import("../types/api").SceneResponse } | null;
+  useEffect(() => {
+    if (!navState?.generatedScene) return;
+    const res = navState.generatedScene;
+    const repoName = res.provider.replace(/^(github:|local:)/, "").split("/").pop() ?? "repo";
+    showCustom(sceneFromGenerated(repoName, res.scene));
+    setGenerated({ model: res.model, cached: res.cached });
+    // Clear the state so navigating away and back doesn't re-trigger
+    window.history.replaceState({}, "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div>
@@ -209,6 +307,8 @@ export function VisualLearningPage() {
         </div>
       </div>
       {genNotice && <p role="status" className="-mt-2 mb-3 text-xs text-warn">{genNotice}</p>}
+      {/* GitHub repo URL input */}
+      <GitHubImport onScene={showCustom} onGenerated={(m, c) => { setGenerated({ model: m, cached: c }); setGenNotice(""); }} />
       <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
         <div className="min-w-0 space-y-4">
           {!scene ? (
@@ -339,9 +439,32 @@ export function VisualLearningPage() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button onClick={() => setIsolated(isolated === sel.id ? null : sel.id)}>{isolated === sel.id ? "Show all parts" : "Isolate this part"}</Button>
-                  <Link to="/chat" state={{ prompt: `Explain the "${sel.label}" in the ${subject.title} architecture in simple terms, and what breaks if it fails.` }}><Button>Explain</Button></Link>
+                  <Button
+                    variant="primary"
+                    data-testid="explain-btn"
+                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                      // Spec requirement: only trust real user clicks, not synthetic events
+                      if (!e.isTrusted) return;
+                      setExplainCtx({
+                        sceneTitle: subject.title,
+                        label: sel.label,
+                        kind: kindLabels[kindOf(sel)],
+                        zone: sel.zone,
+                        summary: sel.summary,
+                        details: sel.details,
+                        apis: sel.apis,
+                        dataModel: sel.dataModel,
+                        failureMode: sel.failureMode,
+                        tradeOffs: sel.tradeOffs,
+                        scaling: sel.scaling,
+                      });
+                      setChatOpen(true);
+                    }}
+                  >
+                    <MessageSquareText size={13} className="mr-1.5 inline align-[-1px]" />Explain
+                  </Button>
                   <Button disabled={remember.isPending} onClick={() => remember.mutate("Remembered from Visual Learning: " + subject.title + " — " + sel.label + ". " + sel.summary)}>Remember</Button>
-                  <Button variant="primary" disabled={remember.isPending} onClick={() => remember.mutate("Added from Visual Learning to " + subject.title + ": " + sel.label + ". " + sel.summary)}>Add to Project</Button>
+                  <Button disabled={remember.isPending} onClick={() => remember.mutate("Added from Visual Learning to " + subject.title + ": " + sel.label + ". " + sel.summary)}>Add to Project</Button>
                 </div>
               </div>
             ) : scene ? (
@@ -354,9 +477,29 @@ export function VisualLearningPage() {
               </div>
             ) : <p className="text-sm text-muted">Choose a system to explore.</p>}
           </Panel>
-          <Panel title="Hand gestures (optional)"><GestureGuide tracking={tracking} status={gestureStatus} />{remember.isSuccess && <p role="status" className="mt-2 rounded bg-ok/10 p-2 text-xs text-ok">Saved as a VISION memory linked to {subject.title}. <Link to="/chat" state={{ prompt: `I saved a visual memory about ${sel?.label ?? "the selected architecture component"} in ${subject.title}. Confirm it and explain how it relates to the project.` }}>Continue in chat</Link></p>}{remember.error && <p className="mt-1 text-xs text-danger">Memory save failed. Try the button above.</p>}</Panel>
+          <Panel title="Hand gestures (optional)"><GestureGuide tracking={tracking} status={gestureStatus} />{remember.isSuccess && <p role="status" className="mt-2 rounded bg-ok/10 p-2 text-xs text-ok">Saved as a VISION memory linked to {subject.title}. <button className="font-semibold text-accent hover:underline" onClick={() => setChatOpen(true)}>Ask AI about it</button></p>}{remember.error && <p className="mt-1 text-xs text-danger">Memory save failed. Try the button above.</p>}</Panel>
         </div>
       </div>
+      {/* Floating explain chat — opened only by a real user click on the Explain button */}
+      <FloatingExplainChat
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        explainContext={explainCtx}
+        currentContext={sel ? {
+          sceneTitle: subject.title,
+          label: sel.label,
+          kind: kindLabels[kindOf(sel)],
+          zone: sel.zone,
+          summary: sel.summary,
+          details: sel.details,
+          apis: sel.apis,
+          dataModel: sel.dataModel,
+          failureMode: sel.failureMode,
+          tradeOffs: sel.tradeOffs,
+          scaling: sel.scaling,
+        } : null}
+        onMemorySaved={() => qc.invalidateQueries({ queryKey: ["memories"] })}
+      />
     </div>
   );
 }

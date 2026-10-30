@@ -15,7 +15,7 @@ def part(pid: str, kind: str = "service", to: list[str] | None = None, zone: str
 
 def scene_json(parts: list[dict]) -> str:
     return json.dumps({
-        "title": "Ride hailing", "description": "A proposed design.", "parts": parts,
+        "title": "Ride hailing", "description": "A proposed model-generated design for learning.", "parts": parts,
         "overview": {"requirements": ["Match riders"], "assumptions": ["1M rides/day"], "architecture": "Services.", "requestFlow": ["Rider requests"]},
     })
 
@@ -25,25 +25,26 @@ VALID_PARTS = [part("rider", "mobile", ["gateway"], "internet"), part("gateway",
 
 
 class FakeGateway:
-    provider = "gemini"
+    provider = "nvidia"
 
     def __init__(self, replies: list):
         self.replies, self.calls = list(replies), []
 
-    async def complete(self, messages, task="planner", max_tokens=4096, extra=None):
+    async def complete(self, messages, task="scene_generation", max_tokens=8192, extra=None):
         self.calls.append({"task": task, "extra": extra, "messages": messages})
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
-        return ModelResult(reply, "gemini", "test-model", 1)
+        return ModelResult(reply, "nvidia", "nvidia/nemotron-3.5-super-vl-120b-a12b", 1)
 
 
 def test_generates_a_valid_scene_from_fenced_json():
     gateway = FakeGateway(["```json\n" + scene_json(VALID_PARTS) + "\n```"])
-    scene, cached = asyncio.run(SceneGenerator(gateway).generate("Uber"))
+    scene, cached, model, provider = asyncio.run(SceneGenerator(gateway).generate("Ride Service"))
     assert not cached and len(scene.parts) == 6
-    assert gateway.calls[0]["extra"] == {"reasoning_effort": "low"}
-    assert "Uber" in gateway.calls[0]["messages"][-1]["content"]
+    assert model == "nvidia/nemotron-3.5-super-vl-120b-a12b" and provider == "nvidia"
+    assert gateway.calls[0]["task"] == "scene_generation"
+    assert "Ride Service" in gateway.calls[0]["messages"][-1]["content"]
 
 
 def test_normalizes_kinds_ids_and_links():
@@ -64,7 +65,7 @@ def test_rejects_disconnected_designs():
 
 def test_asks_the_model_to_fix_an_invalid_reply():
     gateway = FakeGateway(["Sure! Here is the design:", scene_json(VALID_PARTS)])
-    scene, _ = asyncio.run(SceneGenerator(gateway).generate("Uber"))
+    scene, _, _, _ = asyncio.run(SceneGenerator(gateway).generate("Custom Engine"))
     assert len(scene.parts) == 6 and len(gateway.calls) == 2
     assert "not valid" in gateway.calls[1]["messages"][-1]["content"]
 
@@ -72,28 +73,43 @@ def test_asks_the_model_to_fix_an_invalid_reply():
 def test_gives_up_after_two_invalid_replies():
     gateway = FakeGateway(["nope", "still nope"])
     with pytest.raises(AppError) as err:
-        asyncio.run(SceneGenerator(gateway).generate("Uber"))
+        asyncio.run(SceneGenerator(gateway).generate("Custom Engine"))
     assert err.value.code == "scene_generation_failed"
 
 
-def test_falls_back_to_the_fast_model_when_overloaded():
-    gateway = FakeGateway([AppError("provider_error", "503", 502), scene_json(VALID_PARTS)])
-    scene, _ = asyncio.run(SceneGenerator(gateway).generate("Uber"))
-    assert [c["task"] for c in gateway.calls] == ["planner", "fast"] and len(scene.parts) == 6
+def test_serves_pre_cached_scenes_instantly():
+    gateway = FakeGateway([])
+    generator = SceneGenerator(gateway)
+    # 5 demo systems preloaded: uber, netflix, chatgpt, whatsapp, instagram
+    for system in ["uber", "Netflix", "ChatGPT", "WhatsApp", "Instagram"]:
+        scene, cached, model, provider = asyncio.run(generator.generate(system))
+        assert cached is True
+        assert model == "nvidia/nemotron-3.5-super-vl-120b-a12b" and provider == "nvidia"
+        assert len(scene.parts) >= 6
+    # 0 model calls made!
+    assert len(gateway.calls) == 0
 
 
 def test_caches_recent_topics_case_insensitively():
     gateway = FakeGateway([scene_json(VALID_PARTS)])
     generator = SceneGenerator(gateway)
-    asyncio.run(generator.generate("Uber"))
-    _, cached = asyncio.run(generator.generate("  uber "))
+    asyncio.run(generator.generate("Custom Cloud"))
+    _, cached, _, _ = asyncio.run(generator.generate("  custom cloud "))
     assert cached and len(gateway.calls) == 1
 
 
 def test_endpoint_explains_that_demo_mode_cannot_generate(demo):
-    response = demo.post("/api/vision/scene", json={"topic": "Uber"})
+    response = demo.post("/api/vision/scene", json={"topic": "My App"})
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "scene_generation_unavailable"
+
+
+def test_demo_serves_pre_cached_scenes_without_model(demo):
+    response = demo.post("/api/vision/scene", json={"topic": "Uber"})
+    assert response.status_code == 200
+    assert response.json()["cached"] is True
+    assert response.json()["provider"] == "nvidia"
+    assert response.json()["model"] == "nvidia/nemotron-3.5-super-vl-120b-a12b"
 
 
 def test_endpoint_validates_topic(demo):

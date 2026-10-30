@@ -7,14 +7,15 @@ from app.core.errors import AppError
 
 
 class RateLimiter:
-    """In-memory sliding window per client IP. Local single-user MVP; swap for a shared store if deployed."""
+    """In-memory sliding window per authenticated account, or per client IP before authentication."""
 
     def __init__(self, limit: int, window_s: int = 60):
         self.limit, self.window = limit, window_s
         self.hits: dict[str, deque[float]] = defaultdict(deque)
 
     def __call__(self, request: Request) -> None:
-        key = request.client.host if request.client else "local"
+        user_id = getattr(getattr(request, "state", None), "user_id", None)
+        key = f"user:{user_id}" if user_id is not None else f"ip:{request.client.host if request.client else 'local'}"
         now, q = time.monotonic(), self.hits[key]
         while q and now - q[0] > self.window:
             q.popleft()

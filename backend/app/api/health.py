@@ -21,18 +21,39 @@ async def health(request: Request, db: Session = Depends(get_db)):
         "reason": "demo mode" if p.is_demo else "provider is not configured",
     }
     return {
-        "status": "ok", "version": VERSION, "database": "ok",
-        "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo,
-                     "demo_mode": s.demo_mode or s.mock_ai, "endpoint": s.active_base_url,
-                     "reachability": reachability},
+        "status": "ok",
+        "version": VERSION,
+        "database": "ok",
+        "provider": {
+            "name": p.name,
+            "model": p.model,
+            "model_planner": s.model_planner,
+            "model_fast": s.model_fast,
+            "model_embed": s.model_embed,
+            "configured": p.configured,
+            "is_demo": p.is_demo,
+            "demo_mode": s.demo_mode or s.mock_ai,
+            "endpoint": s.active_base_url,
+            "reachability": reachability,
+        },
     }
+
 
 @router.get("/settings")
 def settings_info(request: Request):
     s, p = request.app.state.settings, request.app.state.provider
     return {
-        "provider": {"name": p.name, "model": p.model, "configured": p.configured, "is_demo": p.is_demo, "hosted": p.name in ("nebius", "nvidia", "gemini"),
-                     "endpoint": s.active_base_url},
+        "provider": {
+            "name": p.name,
+            "model": p.model,
+            "model_planner": s.model_planner,
+            "model_fast": s.model_fast,
+            "model_embed": s.model_embed,
+            "configured": p.configured,
+            "is_demo": p.is_demo,
+            "hosted": p.name in ("nebius", "nvidia"),
+            "endpoint": s.active_base_url,
+        },
         "limits": {"max_file_bytes": s.max_file_bytes, "max_context_chars": s.max_context_chars},
         "tools": (
             [{"name": t.name, "description": t.description, "permissions": list(t.permissions), "requires_confirmation": t.requires_confirmation} for t in TOOLS.values()]

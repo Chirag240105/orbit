@@ -1,7 +1,7 @@
 def test_health(client):
     j = client.get("/api/health").json()
     assert j["status"] == "ok" and j["provider"]["configured"] is False
-    assert j["provider"]["name"] == "nebius"
+    assert j["provider"]["name"] in ("nvidia", "nebius")
     assert j["provider"]["reachability"]["reachable"] is False
 
 
@@ -100,6 +100,8 @@ def test_cors_allows_authorization_header_from_configured_origin(client):
     })
     assert r.status_code == 200
     assert "authorization" in r.headers["access-control-allow-headers"].lower()
+
+
 def test_explicit_vision_context_is_saved_as_project_linked_memory(demo):
     result = demo.post("/api/vision/context", json={
         "content": "The API gateway receives frontend requests.",

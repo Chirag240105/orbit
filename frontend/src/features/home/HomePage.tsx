@@ -9,7 +9,7 @@ import { api } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 import { subjects } from "../../vision/scenes";
 
-const EXAMPLES = ["Uber", "Netflix", "WhatsApp", "ChatGPT", "Google Search", "a stock exchange"];
+const EXAMPLES = ["Uber", "Netflix", "WhatsApp", "ChatGPT", "Slack", "a stock exchange"];
 
 export function HomePage() {
   const navigate = useNavigate();

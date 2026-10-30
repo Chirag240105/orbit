@@ -2,19 +2,23 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+import app.services.model_gateway as mg
 from app.config import Settings
 from app.main import create_app
 
 
 def hosted_client(handler):
-    app = create_app(Settings(database_url="sqlite://", _env_file=None, nebius_api_key="test-key-not-real", model_planner="test-planner-model"))
-    import app.providers.nebius as nb
+    app = create_app(Settings(
+        database_url="sqlite://",
+        _env_file=None,
+        nvidia_api_key="test-key-not-real",
+    ))
     real = httpx.AsyncClient
-    nb.httpx.AsyncClient = lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
+    mg.httpx.AsyncClient = lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
     client = TestClient(app, raise_server_exceptions=False)
     auth = client.post("/api/auth/register", json={"email": "provider@example.com", "password": "test-password-123"}).json()
     client.headers["Authorization"] = f"Bearer {auth['access_token']}"
-    return client, lambda: setattr(nb.httpx, "AsyncClient", real)
+    return client, lambda: setattr(mg.httpx, "AsyncClient", real)
 
 
 def ok(request):
@@ -34,12 +38,13 @@ def test_consent_required_then_redacted_send(project):
         assert r.status_code == 409 and r.json()["error"]["code"] == "consent_required"
         assert r.json()["error"]["details"]["redactions"] >= 1
         j = c.post("/api/chat", json={**body, "consent_external": True}).json()
-        assert j["output"]["overview"] == "It prints hi" and j["context"]["external"] is True
+        # Normalizer maps overview → summary in CleanOutput
+        assert "prints hi" in j["output"]["summary"] and j["context"]["external"] is True
     finally:
         restore()
 
 
-@pytest.mark.parametrize("status,code", [(401, "provider_auth_failed"), (429, "provider_rate_limited"), (500, "provider_error")])
+@pytest.mark.parametrize("status,code", [(401, "provider_auth_failed"), (429, "provider_unavailable"), (500, "provider_unavailable")])
 def test_provider_errors_are_generic(status, code):
     c, restore = hosted_client(lambda r: httpx.Response(status, text="SECRET-BODY test-key-not-real"))
     try:
@@ -53,7 +58,12 @@ def test_non_json_reply_falls_back_with_warning():
     c, restore = hosted_client(lambda r: httpx.Response(200, json={"choices": [{"message": {"content": "<think>x</think>Just text"}}]}))
     try:
         j = c.post("/api/chat", json={"message": "hi"}).json()
-        assert j["output"]["answer"] == "Just text" and j["warnings"]
+        # Normalizer puts plain-text fallback in summary (old answer key becomes summary)
+        out = j["output"]
+        text = out.get("summary") or out.get("answer") or ""
+        assert "Just text" in text
+        assert j["provider"]["name"] == "nvidia"
+        assert j["provider"]["model"] == c.app.state.settings.model_fast
     finally:
         restore()
 
@@ -61,6 +71,6 @@ def test_non_json_reply_falls_back_with_warning():
 def test_empty_reasoning_only_reply_is_an_error():
     c, restore = hosted_client(lambda r: httpx.Response(200, json={"choices": [{"message": {"content": None, "reasoning_content": "hmm"}}]}))
     try:
-        assert c.post("/api/chat", json={"message": "hi"}).json()["error"]["code"] == "provider_empty_response"
+        assert c.post("/api/chat", json={"message": "hi"}).json()["error"]["code"] == "provider_unavailable"
     finally:
         restore()

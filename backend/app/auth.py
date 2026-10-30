@@ -79,6 +79,7 @@ def get_current_user(
     if user is None:
         raise AppError("invalid_token", "Your session is invalid or expired. Sign in again.", 401)
     db.info["user_id"] = user.id
+    request.state.user_id = user.id
     return user
 
 

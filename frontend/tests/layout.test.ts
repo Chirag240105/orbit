@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { COLUMN_GAP, defineSystem, layerParts, sceneFromGenerated } from "../src/vision/layout";
 import type { GeneratedScene } from "../src/types/api";
 
-// The connection graph of a real Gemini-generated Uber design.
+// The connection graph of a real Nemotron-generated Uber design.
 const uberLinks: Record<string, string[]> = {
   "rider-app": ["api-gateway"], "driver-app": ["api-gateway", "websocket-gateway"], "api-gateway": ["auth-service", "trip-service", "dispatch-engine"],
   "websocket-gateway": ["location-service"], "auth-service": ["user-db"], "location-service": ["spatial-index", "event-stream"], "spatial-index": [],

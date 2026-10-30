@@ -9,7 +9,7 @@ class DemoProvider(ChatProvider):
 
     name, model, is_demo, configured = "demo", "deterministic-demo", True, True
 
-    async def complete(self, messages: list[dict]) -> ProviderResult:  # pragma: no cover
+    async def complete(self, messages: list[dict], task: str = "chat") -> ProviderResult:  # pragma: no cover
         raise AppError("demo_provider", "Demo provider does not perform model inference.", 500)
 
 
@@ -19,7 +19,7 @@ class UnconfiguredProvider(ChatProvider):
     def __init__(self, provider: str, model: str):
         self.name, self.model = provider, model
 
-    async def complete(self, messages: list[dict]) -> ProviderResult:
+    async def complete(self, messages: list[dict], task: str = "chat") -> ProviderResult:
         raise AppError(
             "provider_not_configured",
             "No model provider is configured. Set the selected provider API key (or LLM_PROVIDER=demo for a labeled demo).",

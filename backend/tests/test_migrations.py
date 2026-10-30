@@ -1,3 +1,5 @@
+import pathlib
+
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
@@ -12,11 +14,20 @@ from app.db.session import Base
 from app.main import create_app
 from app.models import Memory
 
+ALEMBIC_INI = str(pathlib.Path(__file__).resolve().parents[1] / "alembic.ini")
+MIGRATIONS_DIR = str(pathlib.Path(__file__).resolve().parents[1] / "migrations")
+
+
+def _get_alembic_config() -> Config:
+    config = Config(ALEMBIC_INI)
+    config.set_main_option("script_location", MIGRATIONS_DIR)
+    return config
+
 
 def test_initial_migration_creates_prd_tables(tmp_path, monkeypatch):
     database = tmp_path / "fresh.db"
     monkeypatch.setenv("ORBIT_DATABASE_URL", f"sqlite:///{database.as_posix()}")
-    config = Config("alembic.ini")
+    config = _get_alembic_config()
 
     command.upgrade(config, "head")
     command.upgrade(config, "head")
@@ -38,7 +49,7 @@ def test_memory_persists_after_app_restart(tmp_path, monkeypatch):
     database = tmp_path / "restart.db"
     url = f"sqlite:///{database.as_posix()}"
     monkeypatch.setenv("ORBIT_DATABASE_URL", url)
-    config = Config("alembic.ini")
+    config = _get_alembic_config()
     command.upgrade(config, "head")
     settings = Settings(database_url=url, jwt_secret="stable-test-secret", llm_provider="demo", _env_file=None)
 

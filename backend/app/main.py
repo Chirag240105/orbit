@@ -17,9 +17,14 @@ from app.db.session import get_db, init_db
 from app.providers import build_provider
 from app.providers.base import ChatProvider, ProviderResult
 from app.schemas import ChatRequest
-from app.services.model_gateway import ModelGateway
+from app.services.model_gateway import JSON_TASKS, ModelGateway
 from app.services.scene_generator import SceneGenerator
 from app.skills.registry import default_registry
+
+# Tasks that produce structured JSON — these must NEVER stream token-by-token to the client.
+# The model output is buffered server-side and the frontend only receives the final "done" event.
+# Conversational tasks (chat, planner, code_explain) keep streaming normally.
+_STRUCTURED_TASKS = JSON_TASKS | {"planner", "scene_generation", "plan", "code_explain"}
 
 
 class _StreamingProvider(ChatProvider):
@@ -28,13 +33,36 @@ class _StreamingProvider(ChatProvider):
         self.name, self.model = base.name, base.model
         self.is_demo, self.configured = base.is_demo, base.configured
 
-    async def complete(self, messages: list[dict]) -> ProviderResult:
+    async def complete(self, messages: list[dict], task: str = "chat") -> ProviderResult:
         started = time.perf_counter()
         chunks = []
-        async for chunk in self.gateway.stream(messages, task="planner"):
-            chunks.append(chunk)
-            await self.emit("token", {"text": chunk})
-        return ProviderResult("".join(chunks), self.model, False, self.name, round((time.perf_counter() - started) * 1000))
+        reasoning_chunks = []
+        model = self.gateway.model_for(task)
+        is_structured = task in _STRUCTURED_TASKS
+        async for kind, chunk in self.gateway.stream_deltas(messages, task=task):
+            if kind == "model":
+                model = chunk
+            elif kind == "reasoning":
+                reasoning_chunks.append(chunk)
+                # Reasoning deltas go to the debug panel only, never main chat
+                await self.emit("reasoning_delta", {"text": chunk})
+            else:
+                chunks.append(chunk)
+                if not is_structured:
+                    # Conversational tasks only: stream tokens to the client
+                    await self.emit("token", {"text": chunk})
+        # For structured tasks, signal completion without leaking raw JSON fragments
+        if is_structured:
+            await self.emit("processing_complete", {"task": task})
+        return ProviderResult(
+            "".join(chunks),
+            model,
+            False,
+            self.name,
+            round((time.perf_counter() - started) * 1000),
+            reasoning_trace="".join(reasoning_chunks) or None,
+        )
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("orbit")
@@ -59,12 +87,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.registry = default_registry()
     app.state.scene_generator = SceneGenerator(gateway)
     app.add_middleware(
-        CORSMiddleware, allow_origins=settings.origins, allow_methods=["GET", "POST", "PATCH", "DELETE"],
-        allow_headers=["Content-Type", "Authorization"], allow_credentials=False,
+        CORSMiddleware,
+        allow_origins=settings.origins,
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Content-Type", "Authorization"],
+        allow_credentials=False,
     )
     install_error_handlers(app)
     app.include_router(router)
     app.include_router(auth_router)
+
     @app.websocket("/ws/chat")
     async def websocket_chat(websocket: WebSocket):
         origin = websocket.headers.get("origin")
@@ -81,15 +113,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             frame = await websocket.receive_json()
             user_id = verify_token(frame.get("token", ""), app.state.jwt_secret)
-            chat_limit(SimpleNamespace(client=websocket.client))
+            chat_limit(SimpleNamespace(client=websocket.client, state=SimpleNamespace(user_id=user_id)))
             db.info["user_id"] = user_id
             user_request = ChatRequest(**frame.get("request", {}))
             provider = app.state.provider
             if not provider.is_demo:
                 provider = _StreamingProvider(provider, app.state.model_gateway, emit)
             response = await run_chat(
-                user_request, db, settings, provider, app.state.registry,
-                app.state.model_gateway, app.state.last_turns, emit,
+                user_request,
+                db,
+                settings,
+                provider,
+                app.state.registry,
+                app.state.model_gateway,
+                app.state.last_turns,
+                emit,
             )
             await emit("done", response.model_dump(mode="json"))
         except WebSocketDisconnect:
@@ -108,6 +146,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await websocket.close()
             except RuntimeError:
                 pass
+
     p = app.state.provider
     log.info("Provider: %s (%s) configured=%s demo=%s", p.name, p.model or "-", p.configured, p.is_demo)
     return app

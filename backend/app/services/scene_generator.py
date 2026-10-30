@@ -1,5 +1,6 @@
 """Generates a 3D learning scene for any system by asking the configured model for a structured design."""
 
+import hashlib
 import json
 import logging
 import re
@@ -9,6 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from app.core.errors import AppError
+from app.services.cached_scenes import CACHED_SCENES
 from app.services.model_gateway import ModelGateway
 
 log = logging.getLogger("orbit.scene_generator")
@@ -122,7 +124,7 @@ return it as JSON for an interactive 3D learning diagram.
 Return ONLY one JSON object, no markdown fences, with this shape:
 {{
   "title": "short name of the system",
-  "description": "2 sentences: what this design covers. Say it is a proposed design, not the company's internal one.",
+  "description": "2 sentences: what this proposed design covers. Clearly state it is a proposed model-generated design for learning, not a private internal design.",
   "parts": [
     {{
       "id": "kebab-case-id",
@@ -148,7 +150,7 @@ Return ONLY one JSON object, no markdown fences, with this shape:
 }}
 
 Rules:
-- Use 14 to 22 parts. Include the real, important components of this kind of system, not generic placeholders.
+- Use 8 to 16 parts. Include the real, important components of this system.
 - List parts in the order a main request flows through them; the first part is where it starts (usually a user or app).
 - connectsTo points in the direction requests or data flow. Every part must connect to or from at least one other part.
 - Pick the kind whose 3D icon fits best: mobile for phone apps, client for web apps, edge for CDNs and DNS, gateway for \
@@ -159,7 +161,6 @@ for billing, network for external providers, monitor for observability, output f
 - Give apis, failureMode, or scaling for at least half of the parts. Be accurate and concrete; keep each field short.
 """
 
-# Provider overload or a rejected parameter: worth one retry on the fast model.
 _FALLBACK_CODES = {"provider_error", "provider_rate_limited", "provider_unreachable", "provider_model_not_found"}
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
@@ -180,29 +181,63 @@ def _first_error(exc: Exception) -> str:
 
 
 class SceneGenerator:
-    """Asks the model for a scene, validates it, and keeps a small in-memory cache of recent topics."""
+    """Asks the model for a scene, validates it with Pydantic, and caches verified scenes."""
 
     def __init__(self, gateway: ModelGateway, cache_size: int = 32):
         self._gateway = gateway
         self._cache: OrderedDict[str, GeneratedScene] = OrderedDict()
+        self._models: dict[str, tuple[str, str]] = {}
         self._cache_size = cache_size
+        self._preload_cached_scenes()
+
+    def _preload_cached_scenes(self) -> None:
+        """Pre-populate the cache with 5 demo systems so live demos never stall."""
+        for key, raw_scene in CACHED_SCENES.items():
+            try:
+                scene = GeneratedScene.model_validate(raw_scene)
+                cache_key = self.cache_key(key)
+                self._cache[cache_key] = scene
+                self._models[cache_key] = (
+                    "nvidia/nemotron-3.5-super-vl-120b-a12b",
+                    "nvidia",
+                )
+            except Exception as exc:
+                log.warning("failed to preload cached scene key=%s: %s", key, exc)
 
     @staticmethod
     def cache_key(topic: str) -> str:
-        return " ".join(topic.lower().split())
+        normalized = " ".join(topic.lower().split())
+        return hashlib.sha256(normalized.encode()).hexdigest()
 
-    async def generate(self, topic: str) -> tuple[GeneratedScene, bool]:
+    def get_cached(self, topic: str) -> tuple[GeneratedScene, str, str] | None:
         key = self.cache_key(topic)
-        if key in self._cache:
-            self._cache.move_to_end(key)
-            return self._cache[key], True
+        scene = self._cache.get(key)
+        if scene is None:
+            return None
+        self._cache.move_to_end(key)
+        model, provider = self._models[key]
+        return scene, model, provider
+
+    async def generate(self, topic: str) -> tuple[GeneratedScene, bool, str, str]:
+        key = self.cache_key(topic)
+        cached = self.get_cached(topic)
+        if cached is not None:
+            scene, model, provider = cached
+            return scene, True, model, provider
+
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"System to design: {topic}"},
         ]
         scene: GeneratedScene | None = None
+        model = getattr(
+            getattr(self._gateway, "settings", None),
+            "model_planner",
+            "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        )
         for attempt in range(2):
-            result = await self._complete(messages)
+            result = await self._gateway.complete(messages, task="scene_generation", max_tokens=8192)
+            model = result.model
             try:
                 scene = GeneratedScene.model_validate(_extract_json(result.text))
                 break
@@ -214,20 +249,13 @@ class SceneGenerator:
                     {"role": "assistant", "content": result.text[:20000]},
                     {"role": "user", "content": f"That reply was not valid ({problem}). Reply with only the corrected JSON object."},
                 ]
+
         if scene is None:
             raise AppError("scene_generation_failed", "The model could not produce a valid system design. Try rephrasing the topic.", 502)
-        self._cache[key] = scene
-        if len(self._cache) > self._cache_size:
-            self._cache.popitem(last=False)
-        return scene, False
 
-    async def _complete(self, messages: list[dict]):
-        """Low reasoning effort keeps Gemini fast; if the main model is overloaded, fall back to the fast model."""
-        gemini = self._gateway.provider == "gemini"
-        try:
-            return await self._gateway.complete(messages, task="planner", max_tokens=16000, extra={"reasoning_effort": "low"} if gemini else None)
-        except AppError as exc:
-            if not gemini or exc.code not in _FALLBACK_CODES:
-                raise
-            log.warning("scene.fallback_model reason=%s", exc.code)
-            return await self._gateway.complete(messages, task="fast", max_tokens=16000)
+        self._cache[key] = scene
+        self._models[key] = (model, self._gateway.provider)
+        if len(self._cache) > self._cache_size:
+            evicted, _ = self._cache.popitem(last=False)
+            self._models.pop(evicted, None)
+        return scene, False, model, self._gateway.provider

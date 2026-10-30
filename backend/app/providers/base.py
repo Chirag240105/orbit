@@ -11,6 +11,7 @@ class ProviderResult:
     latency_ms: int | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    reasoning_trace: str | None = None
 
 
 class ChatProvider(ABC):
@@ -22,4 +23,4 @@ class ChatProvider(ABC):
     configured: bool = False
 
     @abstractmethod
-    async def complete(self, messages: list[dict]) -> ProviderResult: ...
+    async def complete(self, messages: list[dict], task: str = "chat") -> ProviderResult: ...

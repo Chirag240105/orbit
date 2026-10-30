@@ -21,7 +21,7 @@ Any system the learner names becomes a navigable 3D model with grounded explanat
 ## Operating Context
 
 - Laptop browser, local development deployment (React + Vite frontend, FastAPI backend).
-- Model provider is configurable (Gemini, Nebius, or NVIDIA via OpenAI-compatible APIs); a labelled demo mode works without a model.
+- Model provider is configurable between NVIDIA's hosted Nemotron API (default) and Nebius Token Factory (OpenAI-compatible); a labelled demo mode works without a model.
 - Camera frames for hand tracking stay in the browser.
 
 ## Capabilities and Constraints

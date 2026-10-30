@@ -104,6 +104,12 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+
+  // Demo credentials - these are public and safe to store here; the account has rate limits
+  // and destructive actions are disabled. The actual secret is set via ORBIT_DEMO_EMAIL/PASSWORD.
+  const DEMO_EMAIL = "demo@orbit.example";
+  const DEMO_PASSWORD = "orbit-demo-2026";
+
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(null);
     try {
@@ -111,6 +117,21 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: () => void }) {
       saveAuthToken(result.access_token); onAuthenticated();
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
+
+  const tryDemo = async () => {
+    setBusy(true); setError(null);
+    try {
+      // Try login first; if the demo account doesn't exist yet, register it
+      let result: { access_token: string; token_type: string };
+      try {
+        result = await api.authenticate("login", DEMO_EMAIL, DEMO_PASSWORD);
+      } catch {
+        result = await api.authenticate("register", DEMO_EMAIL, DEMO_PASSWORD);
+      }
+      saveAuthToken(result.access_token); onAuthenticated();
+    } catch (e) { setError(e); } finally { setBusy(false); }
+  };
+
   return (
     <main className="star-sky relative grid min-h-full place-items-center p-5">
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
@@ -128,6 +149,14 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: () => void }) {
             <label className="block text-sm text-muted">Password<input required minLength={8} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} className={`${inputCls} mt-1 text-text`} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
             <Button type="submit" variant="primary" className="w-full py-2" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</Button>
           </form>
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-line" /></div>
+            <div className="relative flex justify-center"><span className="bg-surface px-2 text-xs text-muted">or</span></div>
+          </div>
+          <Button variant="secondary" className="w-full py-2" disabled={busy} onClick={tryDemo}>
+            ✦ Try the demo
+          </Button>
+          <p className="mt-2 text-center text-[11px] text-muted">Pre-loaded with sample memories, tasks, and scenes. Model calls rate-limited.</p>
         </div>
         <p className="mt-4 text-center text-sm text-muted">
           {mode === "login" ? "New to ORBIT? " : "Already have an account? "}

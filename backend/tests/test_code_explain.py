@@ -33,6 +33,8 @@ def test_code_explain_requires_consent_and_redacts_before_hosted_send(monkeypatc
     assert result.status_code == 200
     assert result.json()["redactions"] == 2 and result.json()["external"] is True
     assert "[REDACTED]" in seen[0] and "sk-abcdefghijklmnopqrstuv" not in seen[0]
+    cached = client.post("/api/code/explain", json={**body, "consent_external": True})
+    assert cached.status_code == 200 and len(seen) == 1
 
 
 def test_code_explain_demo_selection_has_structured_response(demo):

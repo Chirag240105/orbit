@@ -5,7 +5,7 @@ import { useActiveWorkspace } from "../../app/WorkspaceContext";
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, Field, PageHeader, Panel, Skeleton, inputCls } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { kb } from "../../lib/format";
-import type { Change, CodeExplainResult, Workspace } from "../../types/api";
+import type { Change, CodeExplainResult, SceneResponse, Workspace } from "../../types/api";
 
 function Changes({ ws }: { ws: Workspace }) {
   const qc = useQueryClient();
@@ -58,11 +58,17 @@ function Workbench({ ws }: { ws: Workspace }) {
       if (error instanceof ApiError && error.code === "consent_required") setCodeConsent({ body, details: error.details as { files?: string[]; chars?: number; redactions?: number; model?: string } });
     },
   });
+  const visualize = useMutation({
+    mutationFn: () => api.generateSceneFromWorkspace(ws.id),
+    onSuccess: (res: SceneResponse) => {
+      nav("/visual", { state: { generatedScene: res } });
+    },
+  });
   const s = summary.data;
 
   return (
     <div className="space-y-4">
-      <Panel title="Project overview" action={<div className="flex gap-2"><Button onClick={() => explain.mutate({ mode: "project", workspace_id: ws.id })}>Explain project</Button><Button onClick={() => explain.mutate({ mode: "flow", workspace_id: ws.id })}>Trace flow</Button><Button variant={ws.allow_write ? "danger" : "secondary"} onClick={() => (ws.allow_write ? setWrite.mutate(false) : setWriteConfirm(true))}>{ws.allow_write ? "Turn off write access" : "Allow writes"}</Button></div>}>
+      <Panel title="Project overview" action={<div className="flex gap-2"><Button onClick={() => explain.mutate({ mode: "project", workspace_id: ws.id })}>Explain project</Button><Button onClick={() => explain.mutate({ mode: "flow", workspace_id: ws.id })}>Trace flow</Button><Button variant="primary" disabled={visualize.isPending} onClick={() => visualize.mutate()} title="Generate an interactive 3D architecture scene from this codebase">{visualize.isPending ? "Generating scene…" : "✦ Visualize design"}</Button><Button variant={ws.allow_write ? "danger" : "secondary"} onClick={() => (ws.allow_write ? setWrite.mutate(false) : setWriteConfirm(true))}>{ws.allow_write ? "Turn off write access" : "Allow writes"}</Button></div>}>
         {summary.isLoading ? <Skeleton className="h-10" /> : s ? (
           <div className="text-sm"><p><b>{s.file_count}</b> supported files. {Object.entries(s.by_extension).slice(0, 6).map(([e, n]) => `${e} ${n}`).join(", ")}</p>
             {s.config_files.length > 0 && <p className="mt-1 text-muted">Config files found: {s.config_files.join(", ")}</p>}
@@ -71,6 +77,7 @@ function Workbench({ ws }: { ws: Workspace }) {
         ) : null}
       </Panel>
       {codeResult && <Panel title={"Code explanation · " + codeResult.mode}><p className="whitespace-pre-wrap text-sm">{codeResult.summary}</p><ul className="mt-2 space-y-1 text-sm">{codeResult.files.map((f) => <li key={f.path}><b>{f.path}</b>: {f.summary}</li>)}</ul>{codeResult.flow_steps.length > 0 && <ol className="mt-2 list-decimal pl-5 text-sm">{codeResult.flow_steps.map((step, i) => <li key={i}>{step}</li>)}</ol>}{codeResult.risks.length > 0 && <p className="mt-2 text-sm text-warn">Risks: {codeResult.risks.join("; ")}</p>}<p className="mt-2 text-xs text-muted">{codeResult.external ? "Sent to the hosted model after redaction and your confirmation." : "Demo placeholder output."} {codeResult.redactions} likely secret(s) redacted.{codeResult.stored_memory_id ? " A project summary was suggested for Memory confirmation." : ""}</p></Panel>}
+      {visualize.error && <div className="mb-2"><ErrorState error={visualize.error} retry={() => visualize.reset()} /></div>}
       {explain.error && explain.error instanceof ApiError && explain.error.code !== "consent_required" && <ErrorState error={explain.error} />}
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
         <Panel title="Files">

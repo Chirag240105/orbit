@@ -15,7 +15,7 @@ export type HandTrackState = HandFrame & {
 };
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
-const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const MODEL_URL = "/models/hand_landmarker.task";
 const INACTIVE: HandTrackState = { active: false, visible: false, pose: null, pinching: false, cursor: { x: 0.5, y: 0.5 }, delta: { x: 0, y: 0 }, holdPose: null, holdProgress: 0, tapSeq: 0, frameSeq: 0 };
 
 function drawSkeleton(canvas: HTMLCanvasElement | null, video: HTMLVideoElement, hand: Point[] | undefined, pinching: boolean) {
@@ -224,7 +224,7 @@ export function GestureGuide({ tracking, status }: { tracking: HandTracking; sta
         })}
       </ul>
       {status && <p role="status" className="mt-2 text-xs text-muted">{status}</p>}
-      <p className="mt-2 text-[11px] text-muted/80">Frames are processed locally and never uploaded. The hand model downloads from Google's CDN; MediaPipe may send usage metrics, but never camera video.</p>
+      <p className="mt-2 text-[11px] text-muted/80">Frames are processed locally and never uploaded. The hand landmarker model is served locally. Frames are processed in-browser and never uploaded.</p>
     </div>
   );
 }

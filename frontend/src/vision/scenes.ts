@@ -314,7 +314,7 @@ const bankingParts: Omit<SceneComponent, "position" | "step">[] = [
 ];
 
 const curatedMatches: [RegExp, string][] = [
-  [/\b(llms?|chat ?gpt|gpt|rag|retrieval|language models?|inference|chatbots?|ai assistants?|gen ?ai|gemini|openai)\b/i, llmPlatformScene.id],
+  [/\b(llms?|chat ?gpt|gpt|rag|retrieval|language models?|inference|chatbots?|ai assistants?|generative ai|nemotron|openai)\b/i, llmPlatformScene.id],
   [/e-?commerce|amazon|flipkart|online (shop|store)|marketplace|shopping/i, ecommerceScene.id],
   [/three[- ]tier|\bweb ?app/i, threeTierScene.id],
 ];

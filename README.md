@@ -31,14 +31,17 @@ This table separates automated or local verification from features that still ne
 
 | Area | Current status |
 |---|---|
-| Backend API, auth, error handling, CORS, rate limits, audit | **Verified locally:** 91 backend tests passed, 2 skipped; Ruff passed. Fresh SQLite migration and smoke requests to `/health`, authenticated `/api/memory`, and `/api/schedule?date=today` passed. |
-| Frontend | **Verified:** TypeScript typecheck, 24 frontend tests, and production build passed. Route-based code splitting reduces initial load from 1.3 MB to ~249 kB (78 kB gzip); Three.js and MediaPipe load only when Visual Learning is opened. All eight route URLs returned the app shell over HTTP. Browser rendering and interaction have not been reviewed manually. |
+| Backend API, auth, error handling, CORS, rate limits, audit | **Verified locally:** 104 backend tests passed, 2 skipped; Ruff passed. Fresh SQLite migration and smoke requests to `/health`, authenticated `/api/memory`, and `/api/schedule?date=today` passed. |
+| Frontend | **Verified:** TypeScript typecheck, 52 frontend tests, and production build passed. Route-based code splitting; Three.js and MediaPipe load only when Visual Learning is opened. |
 | Database migrations | Alembic startup migration and SQLite metadata comparison are tested. PostgreSQL runtime has not been verified in this environment. |
-| Chat, built-in skills, scheduling, memory, workspace policy | Implemented and covered by tests using demo behavior or mocked provider calls. Hosted model output quality is not verified. |
-| Nebius and NVIDIA model gateway | Implemented. Live credentials, model IDs, and generation calls are not verified. Model IDs are intentionally configured by the user. |
-| Visual Learning scene and gestures | Scene, gesture classifier, and coordinate mapping are implemented; gesture unit tests pass. WebGL, camera permission, frame rate, and physical-device behavior are unverified. |
-| VS Code extension | A VSIX package is present. It has not been installed or manually exercised in VS Code. |
-| Deployment | Dockerfiles and compose packaging exist. No live deployment URL, managed database, or HTTPS site is available to verify. |
+| Chat, built-in skills, scheduling, memory, workspace policy | Implemented and covered by tests using demo behavior or mocked provider calls. Hosted model output quality requires a live key to verify. |
+| NVIDIA model gateway | **Implemented and tested:** task-based routing (PLANNER/FAST/EMBED), fallback chain, thinking control, streaming with reasoning/content separation, embeddings with input_type. Live model verification recorded in `docs/MODEL_VERIFICATION.md`. |
+| Nebius provider | Implemented as a configuration switch (`LLM_PROVIDER=nebius`). Live verification not possible; team could not complete card verification from India. See `FEEDBACK.md`. |
+| Visual Learning scene and gestures | Three built-in scenes + model-generated scenes for any searched system. Five pre-generated demo scenes (Uber, Netflix, ChatGPT, WhatsApp, Instagram) load instantly. |
+| ExplainDrawer (visual learning side chat) | **Implemented:** Explain button opens an in-page docked drawer that streams AI answers without leaving /visual. Follow-up questions supported. Conversations appear in AI Workspace history. |
+| Debug panel | **Implemented:** Settings → NVIDIA model telemetry shows provider, model, endpoint, latency, tokens, memories, tool calls per turn. |
+| "Try the demo" button | **Implemented:** one-click demo login on the sign-in screen. |
+| Deployment | `render.yaml`, `vercel.json`, `railway.json`, and Dockerfiles exist. No live public deployment URL verified. |
 
 ## Features and user journey
 
@@ -80,6 +83,66 @@ A safe first journey is:
 2. Open Visual Learning, select a scene component, and save it to Memory.
 3. Open Projects and authorize `examples/example-project` to explore local workspace features.
 4. Try chat and task planning. Demo responses are deterministic placeholders and are labeled as such.
+
+## How ORBIT uses NVIDIA
+
+ORBIT uses NVIDIA's hosted Nemotron API (`https://integrate.api.nvidia.com/v1`) as its default model provider. Every model call goes through a task-based router that selects the right model and controls reasoning.
+
+### Model routing
+
+| Task | Model | Why |
+|---|---|---|
+| Chat, explanations, 3D scene generation, planning | `MODEL_PLANNER` (`nvidia/nemotron-3.5-super-vl-120b-a12b`) | Best structured-JSON reliability; handles complex multi-part outputs |
+| Intent classification, memory importance gating, short replies | `MODEL_FAST` (`nvidia/nemotron-3.5-lightning-30b-a3b`) | ~10–50× lower latency than planner; reserves capacity for heavy work |
+| Memory and retrieval embeddings | `MODEL_EMBED` (`nvidia/nemotron-3.5-embed-1b`) | Asymmetric 2048-dim embeddings with `input_type` (query/passage) |
+| Emergency planner (non-JSON fallback) | `MODEL_FAST` (same) | Keeps the system responsive when the planner is unavailable |
+
+Routing is configured in `backend/app/services/model_gateway.py` (`model_for()` and `fallback_chain_for()`).
+
+### Thinking control
+
+JSON-producing tasks (scene generation, tool argument extraction, memory gating) use `chat_template_kwargs: { enable_thinking: false }` to suppress the reasoning preamble and get clean output. Conversational tasks enable thinking for higher-quality answers. Reasoning content (`reasoning_content` in streaming deltas and `message.reasoning_content` in non-streaming responses) is collected and shown only in the Settings debug panel (collapsed, labeled "reasoning trace") — never in the learner-facing chat.
+
+### Resilience fallback chain
+
+```
+MODEL_PLANNER
+  → on 429/5xx: MODEL_FALLBACK (nvidia/nemotron-3-super-120b-a12b)
+    → on 404/5xx: MODEL_FAST (non-JSON tasks only)
+      → "AI service temporarily unavailable" (tasks, memory, pre-cached scenes still work)
+```
+
+Each step first backs off 1 second on a 429, then advances. The chain is tested in `backend/tests/test_model_gateway.py`.
+
+### Streaming
+
+Chat uses WebSocket (`/ws/chat`) for streaming. The backend `_StreamingProvider` wraps the gateway's `stream_deltas()` and emits separate `token` and `reasoning_delta` events. The frontend collects `token` events for visible output and `reasoning_delta` events for the debug trace.
+
+### Embeddings
+
+`ModelGateway.embed()` calls `MODEL_EMBED` with the appropriate `input_type` (`"query"` for retrieval, `"passage"` for storage). If the embedding call fails, it falls back to a deterministic local hash-based vector of the same dimension so the app stays functional.
+
+### Debug panel
+
+Settings → "NVIDIA model telemetry — debug panel" shows: provider, endpoint host, model ID, latency (model + total), tokens (prompt + completion), retrieved memory IDs, and tool calls — per turn.
+
+---
+
+## Nebius status
+
+ORBIT is built for **Nebius Token Factory** as a configuration-only alternative to NVIDIA. The providers share the same OpenAI-compatible interface; switching requires exactly three environment variable changes:
+
+```dotenv
+LLM_PROVIDER=nebius
+NEBIUS_API_KEY=your-nebius-key
+NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1/
+```
+
+No code changes are needed. The model IDs map to whatever Nebius-compatible models are available on your account.
+
+**Why the demo runs on NVIDIA:** The team (India-based) could not complete the Nebius account card-verification step, which requires payment methods not supported for Indian accounts during the hackathon period. The demo and all model calls use NVIDIA's hosted API. The `LLM_PROVIDER=gemini` value fails startup with a clear error message; only `nvidia`, `nebius`, and `demo` are accepted. See `FEEDBACK.md` for detailed feedback on both platforms.
+
+---
 
 ## Technology
 
@@ -244,7 +307,7 @@ ORBIT_DEMO_MODE=true
 ORBIT_DATABASE_URL=sqlite:///./orbit-dev.db
 ```
 
-SQLite is suitable for local development and tests. For PostgreSQL, keep the example database URL and start the included database in the next step. For hosted model calls, choose `nebius` or `nvidia`, set its API key, and select model IDs returned by `scripts/list_models.py`.
+SQLite is suitable for local development and tests. For PostgreSQL, keep the example database URL and start the included database in the next step. For hosted model calls, NVIDIA is the default: set `NVIDIA_API_KEY`. Nebius is available as a configuration switch by setting `LLM_PROVIDER=nebius` and `NEBIUS_API_KEY`. Select model IDs returned by `scripts/list_models.py` when overriding the configured defaults.
 
 ### 2. Start PostgreSQL when using it
 
@@ -305,15 +368,17 @@ The backend reads `.env` from the working directory or its parent. The following
 
 | Variable | Purpose | Required? | Example / default |
 |---|---|---:|---|
-| `LLM_PROVIDER` | Select `nebius`, `nvidia`, or `demo`. | No | `nebius` in `.env.example`; choose `demo` for no model calls. |
+| `LLM_PROVIDER` | Select `nvidia`, `nebius`, or `demo`. | No | `nvidia` in `.env.example`; choose `demo` for no model calls. |
 | `NEBIUS_API_KEY` | Nebius Token Factory credential. | For Nebius | `your-nebius-key` |
 | `NEBIUS_BASE_URL` | Nebius OpenAI-compatible API root. | No | `https://api.tokenfactory.nebius.com/v1/` |
 | `NVIDIA_API_KEY` | NVIDIA API credential. | For NVIDIA | `your-nvidia-key` |
 | `NVIDIA_BASE_URL` | NVIDIA OpenAI-compatible API root. | No | `https://integrate.api.nvidia.com/v1` |
-| `MODEL_PLANNER` | Model for chat and planning/generation tasks. | For hosted generation | Select a valid ID using `scripts/list_models.py`. Alias `NEBIUS_MODEL` is accepted. |
-| `MODEL_FAST` | Optional fast model for short structured tasks. | No | Unset |
-| `MODEL_EMBED` | Optional remote embedding model. | No | Unset |
-| `ORBIT_EMBEDDING_DIMENSION` | Expected vector size for stored embeddings. | No | `384` |
+| `MODEL_PLANNER` | Primary model for heavy planning and generation tasks. | No | `nvidia/nemotron-3.5-super-vl-120b-a12b` |
+| `MODEL_FAST` | Fast model for intent, memory gates, short replies, and non-JSON emergency fallback. | No | `nvidia/nemotron-3.5-lightning-30b-a3b` |
+| `MODEL_TINY` | Optional small model ID. | No | `nvidia/nemotron-3.5-bolt-e4b` |
+| `MODEL_EMBED` | Remote embedding model. | No | `nvidia/nemotron-3.5-embed-1b` |
+| `MODEL_FALLBACK` | Second-choice planner model. | No | `nvidia/nemotron-3-super-120b-a12b` |
+| `ORBIT_EMBEDDING_DIMENSION` | Expected vector size for stored embeddings. | No | `2048` |
 | `ORBIT_EMBEDDING_FALLBACK_MODEL` | Local Sentence Transformers model used when remote embeddings are unavailable. | No | `.env.example` suggests `sentence-transformers/all-MiniLM-L6-v2`; package install is optional. |
 | `ORBIT_DATABASE_URL` | SQLAlchemy connection URL. | No for SQLite; yes for PostgreSQL | `postgresql+psycopg://orbit:orbit-dev-only@localhost:5432/orbit` |
 | `ORBIT_JWT_SECRET` | Stable signing secret for bearer tokens. | Recommended; required for stable production sessions | Leave blank only for local use; backend creates a process-only secret. |
@@ -352,7 +417,7 @@ The interactive OpenAPI page is available at `/api/docs` while the backend runs.
 
 | Method | Endpoint | Purpose | Authentication |
 |---|---|---|---|
-| `POST` | `/api/chat` | Run a chat/skill request. JSON: `message`, optional `conversation_id`, `skill`, `workspace_id`, `file_paths` (up to 5), `consent_external` (default false). | Bearer token; 30 requests/minute per client |
+| `POST` | `/api/chat` | Run a chat/skill request. JSON: `message`, optional `conversation_id`, `skill`, `workspace_id`, `file_paths` (up to 5), `consent_external` (default false). | Bearer token; 30 requests/minute per account |
 | `GET` | `/api/tools` | List agent tool catalog. | Bearer token |
 | `GET` | `/api/tool-permissions` | Read write-tool trust settings. | Bearer token |
 | `PATCH` | `/api/tool-permissions/{name}` | Change session trust for a writable tool. JSON: `trusted_for_session`. | Bearer token |
@@ -487,7 +552,7 @@ npm test
 npm run build
 ```
 
-Backend tests use SQLite, mocked HTTP, and temporary folders; they do not require model credentials. Frontend tests use Vitest and jsdom; they do not verify real WebGL or camera behavior. The last recorded local run passed **91 backend tests (2 skipped), Ruff, TypeScript typecheck, 24 frontend tests, and the production build**. Route-based code splitting separates Three.js, MediaPipe, and vendor bundles so they load only when needed. Initial page load is ~249 kB (78 kB gzip); the Three.js chunk (860 kB / 232 kB gzip) loads only when Visual Learning is opened.
+Backend tests use SQLite, mocked HTTP, and temporary folders; they do not require model credentials. Frontend tests use Vitest and jsdom; they do not verify real WebGL or camera behavior. The latest local run passed **104 backend tests (2 skipped), Ruff, TypeScript typecheck, 52 frontend tests, and the production build**. Route-based code splitting separates Three.js, MediaPipe, and vendor bundles so they load only when needed. Initial page load is ~249 kB (78 kB gzip); the Three.js chunk (927 kB / 255 kB gzip) loads only when Visual Learning is opened.
 
 For manual demo checks, use [`docs/TESTING.md`](docs/TESTING.md). Live model calls, physical camera behavior, browser rendering, and PostgreSQL deployment remain manual verification items.
 
@@ -498,7 +563,7 @@ The repository has two compose files with different purposes:
 - `docker-compose.yml` starts only local PostgreSQL/pgvector for development.
 - `docker-compose.app.yml` builds the backend and frontend containers, serves the frontend through Nginx, and expects an external PostgreSQL connection. It does not provision that managed database or a public HTTPS endpoint.
 
-The app compose file requires `NEBIUS_API_KEY`, `MODEL_PLANNER`, `MODEL_FAST`, `MODEL_EMBED`, `ORBIT_DATABASE_URL`, `ORBIT_JWT_SECRET`, and `ORBIT_ALLOWED_ORIGINS`. Review the file and set these values through a deployment secret manager. The backend container image runs Alembic and then Uvicorn. No live deployment has been tested.
+The app compose file defaults to NVIDIA and uses the configured Nemotron model IDs. Supply `NVIDIA_API_KEY` for the default provider, or set `LLM_PROVIDER=nebius` and `NEBIUS_API_KEY` when Nebius access is available. `ORBIT_DATABASE_URL`, `ORBIT_JWT_SECRET`, and `ORBIT_ALLOWED_ORIGINS` are required for deployment. Set secrets through a deployment secret manager. The backend container image runs Alembic and then Uvicorn. No live deployment has been tested.
 
 ## Limitations and roadmap
 

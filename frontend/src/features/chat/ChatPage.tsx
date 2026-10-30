@@ -21,7 +21,7 @@ export function ChatPage() {
   const [file, setFile] = useState(nav?.file ?? "");
   const [consent, setConsent] = useState<Consent | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [streamChars, setStreamChars] = useState(0);
+  const [streamStage, setStreamStage] = useState<string | null>(null);
   const [streamEvents, setStreamEvents] = useState<string[]>([]);
   const end = useRef<HTMLDivElement>(null);
   const health = useQuery({ queryKey: ["health"], queryFn: api.health });
@@ -32,19 +32,21 @@ export function ChatPage() {
   const open = async (id: number) => { setConvId(id); setError(null); setThread(await api.messages(id)); };
   const send = useMutation({
     mutationFn: (req: ChatRequest) => chatStream(req, (event, data) => {
-      if (event === "token") setStreamChars((n) => n + String(data.text ?? "").length);
+      if (event === "token") setStreamStage((s) => s ?? "Generating…");
+      if (event === "stage") setStreamStage(String(data.label ?? "Working…"));
+      if (event === "processing_complete") setStreamStage("Formatting answer…");
       const memoryIds = data.memory_ids;
       if (event === "memory_recalled" && Array.isArray(memoryIds)) setStreamEvents((e) => [...e, `${memoryIds.length} memories recalled`]);
       if (event === "tool_call") setStreamEvents((e) => [...e, `Tool ${String(data.name)}: ${String(data.status)}`]);
       if (event === "pending_action") setStreamEvents((e) => [...e, `Action ${String(data.tool_name)} awaits approval`]);
     }),
-    onSuccess: async (r) => { setStreamChars(0); setStreamEvents([]); setConvId(r.conversation_id); setThread(await api.messages(r.conversation_id)); qc.invalidateQueries({ queryKey: ["conversations"] }); },
+    onSuccess: async (r) => { setStreamStage(null); setStreamEvents([]); setConvId(r.conversation_id); setThread(await api.messages(r.conversation_id)); qc.invalidateQueries({ queryKey: ["conversations"] }); },
     onError: (e, req) => {
       if (e instanceof ApiError && e.code === "consent_required" && e.details) {
         const d = e.details as { files: string[]; chars: number; redactions: number; model: string };
         setConsent({ req, files: d.files, chars: d.chars, redactions: d.redactions, model: d.model });
       } else setError(e);
-      setStreamChars(0);
+      setStreamStage(null);
     },
   });
 
@@ -54,7 +56,7 @@ export function ChatPage() {
     if (!text.trim()) return;
     const req: ChatRequest = { message: text.trim(), conversation_id: convId, skill: skill || null, workspace_id: file.trim() ? activeId : null, file_paths: file.trim() ? [file.trim()] : [] };
     setError(null);
-    setStreamChars(0); setStreamEvents([]);
+    setStreamStage(null); setStreamEvents([]);
     setThread((t) => [...t, { id: -Date.now(), role: "user", content: req.message, skill: null, meta: null, created_at: new Date().toISOString() }]);
     setText("");
     send.mutate(req);
@@ -77,7 +79,7 @@ export function ChatPage() {
         {blocked && (
           <div role="status" className="mb-3 rounded-lg border border-warn/40 bg-warn/10 p-4 text-sm">
             <p className="font-medium text-warn">No model is configured</p>
-            <p className="mt-1">Add <code className="font-mono">NEBIUS_API_KEY</code> to <code className="font-mono">.env</code> and restart the backend. To try the interface without a model, set <code className="font-mono">ORBIT_DEMO_MODE=true</code>; demo replies are labeled and are not AI output.</p>
+            <p className="mt-1">Add <code className="font-mono">NVIDIA_API_KEY</code> to <code className="font-mono">.env</code> and restart the backend, or configure <code className="font-mono">LLM_PROVIDER=nebius</code> with <code className="font-mono">NEBIUS_API_KEY</code>. To try the interface without a model, set <code className="font-mono">ORBIT_DEMO_MODE=true</code>; demo replies are labeled and are not AI output.</p>
           </div>
         )}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">
@@ -87,7 +89,7 @@ export function ChatPage() {
               {m.role === "user" ? String(m.content) : <OutputView msg={m} />}
             </div>
           ))}
-          {send.isPending && <div role="status" className="text-sm text-muted">ORBIT is streaming{streamChars ? ` (${streamChars} characters received)` : "…"}{streamEvents.map((event, i) => <span key={`${event}-${i}`} className="ml-2 rounded bg-raised px-2 py-1">{event}</span>)}</div>}
+          {send.isPending && <div role="status" className="flex items-center gap-2 text-sm text-muted">{streamStage && <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />{streamStage}</span>}{streamEvents.map((event, i) => <span key={`${event}-${i}`} className="ml-2 rounded bg-raised px-2 py-1">{event}</span>)}</div>}
           {error != null && <ErrorState error={error} />}
           <div ref={end} />
         </div>

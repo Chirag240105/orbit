@@ -34,7 +34,12 @@ async def save_vision_context(body: VisionContextIn, request: Request, db: Sessi
 async def generate_scene(body: SceneRequest, request: Request):
     """Designs any named system with the configured model, for the 3D Visual Learning Studio."""
     provider = request.app.state.provider
+    generator = request.app.state.scene_generator
+    cached = generator.get_cached(body.topic.strip())
+    if cached is not None:
+        scene, model, model_provider = cached
+        return {"scene": scene, "provider": model_provider, "model": model, "cached": True}
     if provider.is_demo or not provider.configured:
-        raise AppError("scene_generation_unavailable", "Connect a model provider (for example GEMINI_API_KEY) to generate new systems.", 503)
-    scene, cached = await request.app.state.scene_generator.generate(body.topic.strip())
-    return {"scene": scene, "provider": provider.name, "model": provider.model, "cached": cached}
+        raise AppError("scene_generation_unavailable", "Connect a model provider (for example NVIDIA_API_KEY) to generate new systems.", 503)
+    scene, is_cached, model, model_provider = await generator.generate(body.topic.strip())
+    return {"scene": scene, "provider": model_provider, "model": model, "cached": is_cached}
