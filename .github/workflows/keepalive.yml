@@ -7,14 +7,19 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
     steps:
       - name: Ping backend health
         env:
-          URL: ${{ vars.HEALTH_URL }}
+          URL: ${{ vars.HEALTH_URL || secrets.HEALTH_URL }}
         run: |
+          if [ -z "$URL" ]; then
+            echo "::error::Set HEALTH_URL as a repository variable or secret."
+            exit 1
+          fi
+
           for i in 1 2 3 4 5; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL" || echo 000)
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 60 "$URL" || true)
             echo "attempt $i -> HTTP $code"
             [ "$code" = "200" ] && exit 0
             sleep 20
